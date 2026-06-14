@@ -82,7 +82,7 @@ export function MobileNav() {
             </nav>
 
             <div className="mb-4 flex-1 overflow-y-auto">
-              <SidebarHistory />
+              <SidebarHistory onItemClick={() => setOpen(false)} />
             </div>
 
             <div className="mb-4">

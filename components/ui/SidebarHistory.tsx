@@ -15,7 +15,7 @@ interface SessionItem {
   has_n8n?: boolean;
 }
 
-export function SidebarHistory() {
+export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
@@ -80,6 +80,7 @@ export function SidebarHistory() {
     <div className="flex flex-1 flex-col">
       <button
         onClick={() => {
+          onItemClick?.();
           resetChatStore();
           sessionStorage.removeItem('activeSessionId');
           router.push('/chat');
@@ -103,7 +104,10 @@ export function SidebarHistory() {
             return (
               <div
                 key={s.id}
-                onClick={() => router.push(`/chat?id=${s.id}`)}
+                onClick={() => {
+                  onItemClick?.();
+                  router.push(`/chat?id=${s.id}`);
+                }}
                 className={`group flex cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-all duration-200 ${
                   isActive
                     ? 'bg-tertiary text-primary font-bold ring-1 ring-gemini-blue/20'
