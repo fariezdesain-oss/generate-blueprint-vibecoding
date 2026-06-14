@@ -26,7 +26,7 @@ export function MobileNav() {
             <ProviderBadge />
             <button
             onClick={() => setOpen(true)}
-            className="rounded-xl p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+            className="rounded-xl p-3 md:p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-primary"
           >
             <Menu size={20} />
           </button>
@@ -52,7 +52,7 @@ export function MobileNav() {
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="rounded-xl p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                className="rounded-xl p-3 md:p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-primary"
               >
                 <X size={18} />
               </button>

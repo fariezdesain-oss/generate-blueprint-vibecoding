@@ -79,12 +79,12 @@ export default function UpdatePasswordPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-        <div className="glass rounded-2xl p-8 shadow-2xl">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
-              <Sparkles className="size-7 text-gemini-blue" />
+        <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+          <div className="mb-6 sm:mb-8 text-center">
+            <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
+              <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-blue" />
             </div>
-            <h1 className="text-gradient text-2xl font-bold">Reset Password</h1>
+            <h1 className="text-gradient text-xl sm:text-2xl font-bold">Reset Password</h1>
             <p className="mt-1 text-sm text-white/40">
               {success
                 ? 'Password berhasil diubah'
@@ -107,7 +107,7 @@ export default function UpdatePasswordPage() {
               </div>
               <a
                 href="/chat"
-                className="btn-gradient flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold"
+                className="btn-gradient flex items-center justify-center gap-2 w-full py-2.5 sm:py-3 text-sm font-semibold"
               >
                 Kembali ke Chat
               </a>
@@ -152,7 +152,7 @@ export default function UpdatePasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-gradient w-full py-3 text-sm font-semibold flex items-center justify-center gap-2"
+                className="btn-gradient w-full py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -164,7 +164,7 @@ export default function UpdatePasswordPage() {
               </button>
             </form>
           ) : (
-            <div className="flex flex-col items-center gap-4 py-8">
+            <div className="flex flex-col items-center gap-4 py-6 sm:py-8">
               <Loader size={24} className="animate-spin text-gemini-blue" />
               <p className="text-sm text-white/40">Memverifikasi link reset...</p>
             </div>

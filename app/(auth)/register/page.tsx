@@ -90,16 +90,16 @@ export default function RegisterPage() {
     return (
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
         <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-          <div className="glass rounded-2xl p-8 shadow-2xl">
-            <div className="mb-8 text-center">
-              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
-                <Mail className="size-7 text-gemini-orange" />
+          <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+            <div className="mb-6 sm:mb-8 text-center">
+              <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
+                <Mail className="size-5 sm:size-6 lg:size-7 text-gemini-orange" />
               </div>
-              <h1 className="text-gradient text-2xl font-bold">Cek Email Anda</h1>
+              <h1 className="text-gradient text-xl sm:text-2xl font-bold">Cek Email Anda</h1>
               <p className="mt-2 text-sm text-white/40">
                 Kami telah mengirim link verifikasi ke:
               </p>
-              <p className="mt-1 text-sm font-medium text-white/80">{successEmail}</p>
+              <p className="mt-1 text-sm font-medium text-white/80 truncate">{successEmail}</p>
             </div>
 
             <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-4">
@@ -114,7 +114,7 @@ export default function RegisterPage() {
             <button
               onClick={handleResend}
               disabled={resendLoading || resendCooldown > 0}
-              className="btn-gradient-google w-full mt-6 py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              className="btn-gradient-google w-full mt-6 py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
             >
               {resendLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -160,12 +160,12 @@ export default function RegisterPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-        <div className="glass rounded-2xl p-8 shadow-2xl">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
-              <Sparkles className="size-7 text-gemini-orange" />
+        <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+          <div className="mb-6 sm:mb-8 text-center">
+            <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
+              <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-orange" />
             </div>
-            <h1 className="text-gradient text-2xl font-bold">Buat Akun</h1>
+            <h1 className="text-gradient text-xl sm:text-2xl font-bold">Buat Akun</h1>
             <p className="mt-1 text-sm text-white/40">Daftar untuk mulai menggunakan</p>
           </div>
 
@@ -212,7 +212,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-gradient-google w-full py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              className="btn-gradient-google w-full py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

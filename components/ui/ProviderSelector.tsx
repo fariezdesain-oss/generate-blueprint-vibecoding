@@ -240,28 +240,28 @@ export function ProviderSelector() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(p)}
-                    className="rounded-xl border border-subtle px-3 py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
+                    className="rounded-xl border border-subtle px-3 py-2 md:py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleTestSaved(p.id)}
                     disabled={testingProviderId === p.id}
-                    className="rounded-xl border border-subtle px-3 py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
+                    className="rounded-xl border border-subtle px-3 py-2 md:py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
                   >
                     {testingProviderId === p.id ? 'Testing...' : 'Test'}
                   </button>
                 {!p.is_active && (
                   <button
                     onClick={() => handleActivate(p.id)}
-                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-4 py-1.5 text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-4 py-2 md:py-1.5 text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                   >
                     Activate
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="rounded-xl bg-red-500/10 px-4 py-1.5 text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
+                  className="rounded-xl bg-red-500/10 px-4 py-2 md:py-1.5 text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
                 >
                   Delete
                 </button>

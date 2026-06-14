@@ -131,7 +131,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}&mode=n8n`);
                     }}
-                    className="rounded-xl p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
+                    className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
                     title="View n8n Workflow"
                   >
                     <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -145,7 +145,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}`);
                     }}
-                    className="rounded-xl p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
+                    className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
                     title="View Docs"
                   >
                     <FileText size={16} />
@@ -153,7 +153,7 @@ export default function HistoryPage() {
                 )}
               <button
                 onClick={(e) => handleDeleteClick(s, e)}
-                className="rounded-xl p-2.5 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
+                className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
                 title="Delete session"
               >
                 <Trash2 size={16} />

@@ -33,12 +33,12 @@ export default function ForgotPasswordPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-        <div className="glass rounded-2xl p-8 shadow-2xl">
-          <div className="mb-8 text-center">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
-              <Sparkles className="size-7 text-gemini-blue" />
+        <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+          <div className="mb-6 sm:mb-8 text-center">
+            <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
+              <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-blue" />
             </div>
-            <h1 className="text-gradient text-2xl font-bold">Lupa Password</h1>
+            <h1 className="text-gradient text-xl sm:text-2xl font-bold">Lupa Password</h1>
             <p className="mt-1 text-sm text-white/40">
               {sent
                 ? 'Cek email Anda untuk link reset password'
@@ -55,14 +55,14 @@ export default function ForgotPasswordPage() {
           {sent ? (
             <div className="space-y-4">
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-4">
-                <p className="text-center text-sm text-emerald-300">
-                  Link reset password telah dikirim ke <strong>{email}</strong>.
+                <p className="text-center text-sm text-emerald-300 break-words">
+                  Link reset password telah dikirim ke <strong className="break-all">{email}</strong>.
                   Cek inbox atau folder spam Anda.
                 </p>
               </div>
               <a
                 href="/login"
-                className="btn-gradient flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold"
+                className="btn-gradient flex items-center justify-center gap-2 w-full py-2.5 sm:py-3 text-sm font-semibold"
               >
                 <ArrowLeft size={16} />
                 Kembali ke Login
@@ -85,7 +85,7 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="btn-gradient w-full py-3 text-sm font-semibold flex items-center justify-center gap-2"
+                className="btn-gradient w-full py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
               >
                 {loading ? 'Mengirim...' : 'Kirim Link Reset'}
               </button>

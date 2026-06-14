@@ -722,7 +722,7 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 disabled={isGenerating}
                 placeholder={isGenerating ? "Tunggu hingga AI selesai merespon..." : "Ketik pesan..."}
-                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-4 py-3 sm:px-6 sm:py-4 pr-14 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-4 py-3 sm:px-6 sm:py-4 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ maxHeight: '240px' }}
               />
             </div>
@@ -730,23 +730,23 @@ export default function ChatPage() {
             {isGenerating ? (
               <button
                 onClick={stopGeneration}
-                className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/30 hover:text-red-300 border border-red-500/20"
+                className="flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/30 hover:text-red-300 border border-red-500/20"
               >
-                <Square size={18} className="fill-current" />
+                <Square size={16} className="fill-current" />
               </button>
             ) : (
               <div className="flex gap-2">
                 <button
                   onClick={sendMessage}
                   disabled={(!input.trim() && pendingFiles.length === 0) || isGenerating}
-                  className="flex size-14 shrink-0 items-center justify-center rounded-2xl btn-gradient disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+                  className="flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl btn-gradient disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
                 >
-                  <Send size={20} />
+                  <Send size={18} />
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={!canGenerate || generating}
-                  className={`flex size-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed ${
+                  className={`flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed ${
                     canGenerate
                       ? mode === 'n8n'
                         ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
