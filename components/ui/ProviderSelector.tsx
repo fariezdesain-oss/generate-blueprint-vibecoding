@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Pencil, Play, Power, Trash2 } from 'lucide-react';
 
 interface ProviderItem {
   id: string;
@@ -237,33 +238,43 @@ export function ProviderSelector() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2">
                   <button
                     onClick={() => handleEdit(p)}
-                    className="rounded-xl border border-subtle px-2.5 sm:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
+                    className="rounded-xl border border-subtle px-1.5 sm:px-2.5 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
                   >
-                    Edit
+                    <Pencil className="size-3 sm:size-3.5 sm:hidden" />
+                    <span className="hidden sm:inline">Edit</span>
                   </button>
                   <button
                     onClick={() => handleTestSaved(p.id)}
                     disabled={testingProviderId === p.id}
-                    className="rounded-xl border border-subtle px-2.5 sm:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
+                    className="rounded-xl border border-subtle px-1.5 sm:px-2.5 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
                   >
-                    {testingProviderId === p.id ? 'Testing...' : 'Test'}
+                    {testingProviderId === p.id ? (
+                      <span className="size-3 sm:size-3.5 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="size-3 sm:size-3.5 sm:hidden" />
+                        <span className="hidden sm:inline">Test</span>
+                      </>
+                    )}
                   </button>
                 {!p.is_active && (
                   <button
                     onClick={() => handleActivate(p.id)}
-                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-3 sm:px-4 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-1.5 sm:px-2.5 lg:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                   >
-                    Activate
+                    <Power className="size-3 sm:size-3.5 sm:hidden" />
+                    <span className="hidden sm:inline">Activate</span>
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(p.id)}
-                    className="rounded-xl bg-red-500/10 px-3 sm:px-4 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
+                    className="rounded-xl bg-red-500/10 px-1.5 sm:px-2.5 lg:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
                 >
-                  Delete
+                    <Trash2 className="size-3 sm:size-3.5 sm:hidden" />
+                    <span className="hidden sm:inline">Delete</span>
                 </button>
               </div>
             </div>

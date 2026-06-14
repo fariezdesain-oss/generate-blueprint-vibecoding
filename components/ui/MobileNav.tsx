@@ -23,7 +23,6 @@ export function MobileNav() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <ProviderBadge />
             <button
             onClick={() => setOpen(true)}
             className="rounded-xl p-3 md:p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-primary"
@@ -77,6 +76,10 @@ export function MobileNav() {
                 Settings
               </Link>
             </nav>
+
+            <div className="mb-4 px-3">
+              <ProviderBadge />
+            </div>
 
             <div className="mb-4 flex-1 overflow-y-auto">
               <SidebarHistory />

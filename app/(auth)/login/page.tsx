@@ -53,9 +53,8 @@ function LoginForm() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       if (
         error.message.toLowerCase().includes('email not confirmed') ||
         error.code === 'email_not_confirmed'
