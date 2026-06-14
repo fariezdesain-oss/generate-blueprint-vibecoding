@@ -29,6 +29,7 @@ export function ProviderSelector() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fetchingRef = { current: false };
@@ -153,11 +154,19 @@ export function ProviderSelector() {
     notifyProviderChanged();
   };
 
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/providers/${id}`, { method: 'DELETE' });
+  const handleDelete = (id: string) => {
+    setDeleteTargetId(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTargetId) return;
+    await fetch(`/api/providers/${deleteTargetId}`, { method: 'DELETE' });
     await fetchProviders();
     notifyProviderChanged();
+    setDeleteTargetId(null);
   };
+
+  const cancelDelete = () => setDeleteTargetId(null);
 
   if (pageLoading && providers.length === 0) {
     return (
@@ -362,6 +371,34 @@ export function ProviderSelector() {
           </button>
         </div>
       </form>
+
+      {deleteTargetId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-4 sm:p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
+              <svg className="size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+              </svg>
+            </div>
+            <h3 className="mb-2 text-lg font-semibold text-primary">Hapus Provider</h3>
+            <p className="mb-6 text-sm text-secondary">Anda yakin ingin menghapus provider ini?</p>
+            <div className="flex gap-3">
+              <button
+                onClick={cancelDelete}
+                className="flex-1 rounded-xl border border-subtle py-2.5 text-sm font-medium text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+              >
+                Tidak
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-red-400"
+              >
+                Ya, Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

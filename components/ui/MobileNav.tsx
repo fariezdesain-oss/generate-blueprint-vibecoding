@@ -57,6 +57,10 @@ export function MobileNav() {
               </button>
             </div>
 
+            <div className="mb-4 px-3">
+              <ProviderBadge />
+            </div>
+
             <nav className="mb-4 flex flex-col gap-1">
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-tertiary">Navigasi</p>
               <Link
@@ -76,10 +80,6 @@ export function MobileNav() {
                 Settings
               </Link>
             </nav>
-
-            <div className="mb-4 px-3">
-              <ProviderBadge />
-            </div>
 
             <div className="mb-4 flex-1 overflow-y-auto">
               <SidebarHistory />

@@ -611,7 +611,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
       {generating && mode === 'n8n' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
           <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 sm:p-8 shadow-2xl">
