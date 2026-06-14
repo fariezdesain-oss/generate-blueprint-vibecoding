@@ -71,7 +71,7 @@ export default async function DashboardLayout({
           </div>
         </aside>
 
-        <main className="relative flex flex-1 flex-col overflow-y-auto">{children}</main>
+        <main className="relative flex flex-1 flex-col overflow-y-auto pt-16 md:pt-0">{children}</main>
       </div>
     </SessionManager>
     </Providers>

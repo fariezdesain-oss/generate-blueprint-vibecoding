@@ -12,7 +12,7 @@ export function MobileNav() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-subtle backdrop-blur-xl px-4 py-3 md:hidden" style={{ backgroundColor: `rgba(var(--bg-primary-rgb), 0.8)` }}>
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 border-b border-subtle backdrop-blur-xl px-4 py-3 md:hidden" style={{ backgroundColor: `rgba(var(--bg-primary-rgb), 0.8)` }}>
           <div className="flex items-center gap-2.5">
             <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/20 ring-1 ring-[var(--border)]">
               <Sparkles className="size-4 text-gemini-blue" />
