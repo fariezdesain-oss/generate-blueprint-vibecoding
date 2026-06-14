@@ -178,6 +178,15 @@ body {
     padding: 1.25rem;
   }
 
+  @media (max-width: 640px) {
+    .input-gemini {
+      padding: 0.75rem 1rem;
+    }
+    .card-gemini {
+      padding: 1rem;
+    }
+  }
+
   .card-gemini:hover {
     background: color-mix(in srgb, var(--card-bg), var(--border));
     border-color: color-mix(in srgb, var(--card-border), var(--border));

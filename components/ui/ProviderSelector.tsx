@@ -167,7 +167,7 @@ export function ProviderSelector() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {notification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
           <div className={`animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 text-center shadow-2xl ${
@@ -216,7 +216,7 @@ export function ProviderSelector() {
           {providers.map((p) => (
             <div
               key={p.id}
-              className={`card-gemini flex items-center justify-between px-5 py-4 ${
+              className={`card-gemini flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 ${
                 p.is_active ? 'card-gemini-active' : ''
               }`}
             >
@@ -271,7 +271,7 @@ export function ProviderSelector() {
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-5 card-gemini p-6">
+      <form onSubmit={handleSave} className="space-y-4 card-gemini p-4 sm:p-6">
         <h2 className="text-lg font-semibold text-primary">Add Provider</h2>
 
         <div>
@@ -330,7 +330,7 @@ export function ProviderSelector() {
           <button
             type="submit"
             disabled={!form.api_key || !form.model_name || saving || testing}
-            className="btn-gradient flex-1 py-3 text-sm font-semibold"
+            className="btn-gradient flex-1 py-2.5 sm:py-3 text-sm font-semibold"
           >
             {saving ? 'Saving...' : 'Save & Test Connection'}
           </button>
@@ -338,7 +338,7 @@ export function ProviderSelector() {
             type="button"
             onClick={() => testConnection()}
             disabled={!form.api_key || !form.model_name || testing || saving}
-            className="rounded-xl border border-subtle px-6 py-3 text-sm font-medium text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-30"
+            className="rounded-xl border border-subtle px-4 py-2.5 sm:px-6 sm:py-3 text-sm font-medium text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-30"
           >
             {testing ? (
               <span className="flex items-center gap-2">

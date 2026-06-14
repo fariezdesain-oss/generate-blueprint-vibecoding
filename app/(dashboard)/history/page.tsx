@@ -65,10 +65,10 @@ export default function HistoryPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl p-6">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+      <div className="mb-5 sm:mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-gradient text-2xl font-bold">History</h1>
+          <h1 className="text-gradient text-xl sm:text-2xl font-bold">History</h1>
           <p className="mt-1 text-sm text-tertiary">Riwayat sesi percakapan</p>
         </div>
         <button
@@ -76,7 +76,7 @@ export default function HistoryPage() {
             useChatStore.getState().bumpNewChat();
             router.push('/chat');
           }}
-          className="btn-gradient flex items-center gap-2 px-5 py-2.5 text-sm"
+          className="btn-gradient flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 text-sm"
         >
           <Plus size={16} />
           New Chat
@@ -84,8 +84,8 @@ export default function HistoryPage() {
       </div>
 
       {sessions.length === 0 && (
-        <div className="flex flex-col items-center gap-4 py-16">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+        <div className="flex flex-col items-center gap-4 py-10 sm:py-16">
+          <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
             <Sparkles className="size-8 text-tertiary" />
           </div>
           <p className="text-sm text-tertiary">Belum ada sesi</p>
@@ -100,7 +100,7 @@ export default function HistoryPage() {
             className="card-gemini group flex cursor-pointer items-center justify-between"
           >
             <div className="flex items-center gap-5">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-tertiary ring-1 ring-[var(--border)]">
+              <div className="flex size-10 sm:size-12 items-center justify-center rounded-xl bg-tertiary ring-1 ring-[var(--border)]">
                 <MessageSquare size={18} className="text-tertiary" />
               </div>
               <div>
@@ -165,7 +165,7 @@ export default function HistoryPage() {
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 text-center shadow-2xl">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-4 sm:p-6 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
               <svg className="size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />

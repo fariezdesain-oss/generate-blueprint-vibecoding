@@ -549,19 +549,19 @@ export default function ChatPage() {
 
   if (showModePicker) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center p-8">
+      <div className="flex flex-1 flex-col items-center justify-center p-5 sm:p-8">
         <div className="animate-fade-in-up mx-auto w-full max-w-2xl">
           <div className="mb-8 text-center">
-            <h1 className="text-gradient text-3xl font-extrabold">Generate Instruksi Vibecoding</h1>
+            <h1 className="text-gradient text-2xl sm:text-3xl font-extrabold">Generate Instruksi Vibecoding</h1>
             <p className="mt-3 text-sm font-semibold text-secondary">Pilih mode generate sebelum memulai sesi</p>
           </div>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <button
               onClick={() => handleModePick('docs')}
               disabled={pickingMode}
-              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-8 text-center transition-all duration-300 hover:border-gemini-blue/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] disabled:opacity-50"
+              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-5 sm:p-8 text-center transition-all duration-300 hover:border-gemini-blue/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] disabled:opacity-50"
             >
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20 transition-all duration-300 group-hover:from-gemini-blue/30 group-hover:ring-gemini-blue/30">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20 transition-all duration-300 group-hover:from-gemini-blue/30 group-hover:ring-gemini-blue/30">
                 <FileText size={32} className="text-gemini-blue" />
               </div>
               <div>
@@ -582,9 +582,9 @@ export default function ChatPage() {
             <button
               onClick={() => handleModePick('n8n')}
               disabled={pickingMode}
-              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-8 text-center transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)] disabled:opacity-50"
+              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-5 sm:p-8 text-center transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)] disabled:opacity-50"
             >
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20 transition-all duration-300 group-hover:from-emerald-500/30 group-hover:ring-emerald-500/30">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20 transition-all duration-300 group-hover:from-emerald-500/30 group-hover:ring-emerald-500/30">
                 <svg className="size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
@@ -710,7 +710,7 @@ export default function ChatPage() {
 
       <ChatWindow />
 
-      <div className="border-t border-subtle p-6">
+      <div className="border-t border-subtle p-3 sm:p-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
           <FilePicker key={filePickerKey} sessionId={sessionId} onFilesReady={setPendingFiles} disabled={isGenerating} />
           <div className="flex gap-3">
@@ -722,7 +722,7 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 disabled={isGenerating}
                 placeholder={isGenerating ? "Tunggu hingga AI selesai merespon..." : "Ketik pesan..."}
-                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-6 py-4 pr-14 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-4 py-3 sm:px-6 sm:py-4 pr-14 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ maxHeight: '240px' }}
               />
             </div>

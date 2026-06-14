@@ -26,11 +26,11 @@ export const ChatWindow = memo(function ChatWindow() {
     return (
       <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4 animate-float">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/10 to-gemini-blue/10 ring-1 ring-[var(--border)]">
+          <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/10 to-gemini-blue/10 ring-1 ring-[var(--border)]">
             <Sparkles className="size-8 text-gemini-blue" />
           </div>
           <div className="text-center">
-            <h2 className="text-gradient text-lg font-semibold">Mulai Percakapan</h2>
+            <h2 className="text-gradient text-base sm:text-lg font-semibold">Mulai Percakapan</h2>
             <p className="mt-1 text-sm text-tertiary">Tanyakan sesuatu untuk memulai</p>
           </div>
         </div>
@@ -39,7 +39,7 @@ export const ChatWindow = memo(function ChatWindow() {
   }
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto px-4 py-6">
+    <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6">
       <div className="mx-auto max-w-3xl space-y-3">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
