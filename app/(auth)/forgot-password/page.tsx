@@ -1,0 +1,107 @@
+'use client';
+
+import { useState } from 'react';
+import { Sparkles, ArrowLeft } from 'lucide-react';
+import { createClient } from '@/lib/db/supabaseBrowserClient';
+
+export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const supabase = createClient();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+
+    setSent(true);
+  };
+
+  return (
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
+      <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
+        <div className="glass rounded-2xl p-8 shadow-2xl">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
+              <Sparkles className="size-7 text-gemini-blue" />
+            </div>
+            <h1 className="text-gradient text-2xl font-bold">Lupa Password</h1>
+            <p className="mt-1 text-sm text-white/40">
+              {sent
+                ? 'Cek email Anda untuk link reset password'
+                : 'Masukkan email untuk menerima link reset'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 animate-fade-in rounded-xl bg-red-500/10 border border-red-500/20 px-4 py-3">
+              <p className="text-center text-sm text-red-400">{error}</p>
+            </div>
+          )}
+
+          {sent ? (
+            <div className="space-y-4">
+              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-4">
+                <p className="text-center text-sm text-emerald-300">
+                  Link reset password telah dikirim ke <strong>{email}</strong>.
+                  Cek inbox atau folder spam Anda.
+                </p>
+              </div>
+              <a
+                href="/login"
+                className="btn-gradient flex items-center justify-center gap-2 w-full py-3 text-sm font-semibold"
+              >
+                <ArrowLeft size={16} />
+                Kembali ke Login
+              </a>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1.5 block text-sm text-white/60">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="input-gemini"
+                  placeholder="nama@email.com"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-gradient w-full py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                {loading ? 'Mengirim...' : 'Kirim Link Reset'}
+              </button>
+
+              <p className="text-center text-sm text-white/40">
+                <a
+                  href="/login"
+                  className="text-gemini-blue/60 hover:text-gemini-blue transition-colors font-medium"
+                >
+                  Kembali ke Login
+                </a>
+              </p>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
