@@ -153,7 +153,7 @@ export function validateN8nWorkflow(
       }
     }
 
-    for (const nodeName of activeNodeNames) {
+    for (const nodeName of Array.from(activeNodeNames)) {
       if (!connectedNodes.has(nodeName)) {
         warnings.push(`Node "${nodeName}" tidak terhubung ke node lain (orphan node). Pastikan node ini terhubung dalam alur workflow.`);
       }
