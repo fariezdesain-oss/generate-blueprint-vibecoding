@@ -66,17 +66,17 @@ export default function HistoryPage() {
 
   return (
     <div className="mx-auto w-full max-w-3xl p-4 sm:p-6">
-      <div className="mb-5 sm:mb-8 flex items-center justify-between">
+      <div className="mb-4 sm:mb-6 lg:mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-gradient text-xl sm:text-2xl font-bold">History</h1>
-          <p className="mt-1 text-sm text-tertiary">Riwayat sesi percakapan</p>
+          <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">History</h1>
+          <p className="mt-1 text-xs sm:text-sm text-tertiary">Riwayat sesi percakapan</p>
         </div>
         <button
           onClick={() => {
             useChatStore.getState().bumpNewChat();
             router.push('/chat');
           }}
-          className="btn-gradient flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 text-sm"
+          className="btn-gradient flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 lg:px-5 lg:py-2.5 text-xs sm:text-sm"
         >
           <Plus size={16} />
           New Chat
@@ -84,7 +84,7 @@ export default function HistoryPage() {
       </div>
 
       {sessions.length === 0 && (
-        <div className="flex flex-col items-center gap-4 py-10 sm:py-16">
+        <div className="flex flex-col items-center gap-3 sm:gap-4 py-8 sm:py-12">
           <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
             <Sparkles className="size-8 text-tertiary" />
           </div>
@@ -131,7 +131,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}&mode=n8n`);
                     }}
-                    className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
+                    className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
                     title="View n8n Workflow"
                   >
                     <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -145,7 +145,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}`);
                     }}
-                    className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
+                    className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
                     title="View Docs"
                   >
                     <FileText size={16} />
@@ -153,7 +153,7 @@ export default function HistoryPage() {
                 )}
               <button
                 onClick={(e) => handleDeleteClick(s, e)}
-                className="rounded-xl p-3 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
+                className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
                 title="Delete session"
               >
                 <Trash2 size={16} />

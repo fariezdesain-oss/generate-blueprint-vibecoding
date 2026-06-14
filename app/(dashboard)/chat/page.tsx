@@ -552,20 +552,20 @@ export default function ChatPage() {
       <div className="flex flex-1 flex-col items-center justify-center p-5 sm:p-8">
         <div className="animate-fade-in-up mx-auto w-full max-w-2xl">
           <div className="mb-8 text-center">
-            <h1 className="text-gradient text-2xl sm:text-3xl font-extrabold">Generate Instruksi Vibecoding</h1>
-            <p className="mt-3 text-sm font-semibold text-secondary">Pilih mode generate sebelum memulai sesi</p>
+            <h1 className="text-gradient text-xl sm:text-2xl lg:text-3xl font-extrabold">Generate Instruksi Vibecoding</h1>
+            <p className="mt-2 sm:mt-3 text-xs sm:text-sm font-semibold text-secondary">Pilih mode generate sebelum memulai sesi</p>
           </div>
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2">
             <button
               onClick={() => handleModePick('docs')}
               disabled={pickingMode}
-              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-5 sm:p-8 text-center transition-all duration-300 hover:border-gemini-blue/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] disabled:opacity-50"
+              className="group relative flex flex-col items-center gap-4 sm:gap-5 rounded-2xl border border-subtle bg-primary p-4 sm:p-6 lg:p-8 text-center transition-all duration-300 hover:border-gemini-blue/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] disabled:opacity-50"
             >
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20 transition-all duration-300 group-hover:from-gemini-blue/30 group-hover:ring-gemini-blue/30">
-                <FileText size={32} className="text-gemini-blue" />
+              <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20 transition-all duration-300 group-hover:from-gemini-blue/30 group-hover:ring-gemini-blue/30">
+                <FileText className="size-6 lg:size-8 text-gemini-blue" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-primary">Dokumen Instruksi Vibecoding</h2>
+                <h2 className="text-sm sm:text-base lg:text-lg font-bold text-primary">Dokumen Instruksi Vibecoding</h2>
                 <p className="mt-2 text-xs font-semibold text-tertiary leading-relaxed">
                   Generate 12 dokumen engineering standar (PRD, Architecture, Requirements, dll.)
                   berdasarkan diskusi proyek dengan AI.
@@ -582,15 +582,15 @@ export default function ChatPage() {
             <button
               onClick={() => handleModePick('n8n')}
               disabled={pickingMode}
-              className="group relative flex flex-col items-center gap-5 rounded-2xl border border-subtle bg-primary p-5 sm:p-8 text-center transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)] disabled:opacity-50"
+              className="group relative flex flex-col items-center gap-4 sm:gap-5 rounded-2xl border border-subtle bg-primary p-4 sm:p-6 lg:p-8 text-center transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)] disabled:opacity-50"
             >
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20 transition-all duration-300 group-hover:from-emerald-500/30 group-hover:ring-emerald-500/30">
-                <svg className="size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20 transition-all duration-300 group-hover:from-emerald-500/30 group-hover:ring-emerald-500/30">
+                <svg className="size-6 lg:size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-bold text-primary">Generate Workflow n8n</h2>
+                <h2 className="text-sm sm:text-base lg:text-lg font-bold text-primary">Generate Workflow n8n</h2>
                 <p className="mt-2 text-xs font-semibold text-tertiary leading-relaxed">
                   AI akan menggali kebutuhan automation Anda dan menghasilkan file .json workflow
                   n8n yang siap di-import langsung ke n8n.
@@ -614,10 +614,10 @@ export default function ChatPage() {
     <div className="flex flex-1 flex-col">
       {generating && mode === 'n8n' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-8 shadow-2xl">
-            <div className="flex flex-col items-center gap-6">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20">
-                <svg className="size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 sm:p-8 shadow-2xl">
+            <div className="flex flex-col items-center gap-4 sm:gap-6">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20">
+                <svg className="size-6 sm:size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
               </div>
@@ -637,10 +637,10 @@ export default function ChatPage() {
 
       {generating && mode !== 'n8n' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-md glass rounded-2xl p-8 shadow-2xl">
-            <div className="flex flex-col items-center gap-6">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20">
-                <svg className="size-8 text-gemini-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <div className="animate-fade-in-up mx-4 w-full max-w-md glass rounded-2xl p-6 sm:p-8 shadow-2xl">
+            <div className="flex flex-col items-center gap-4 sm:gap-6">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20">
+                <svg className="size-6 sm:size-8 text-gemini-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
                   <line x1="16" y1="13" x2="8" y2="13" />
@@ -691,16 +691,16 @@ export default function ChatPage() {
 
       {chatError && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl border border-red-500/20 p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
-              <svg className="size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl border border-red-500/20 p-5 sm:p-6 text-center shadow-2xl">
+            <div className="mx-auto mb-3 sm:mb-4 flex size-12 sm:size-14 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
+              <svg className="size-5 sm:size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <p className="text-sm text-secondary">{chatError}</p>
+            <p className="text-xs sm:text-sm text-secondary">{chatError}</p>
             <button
               onClick={() => setChatError(null)}
-              className="mt-5 w-full rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-red-400"
+              className="mt-4 sm:mt-5 w-full rounded-xl bg-red-500 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white transition-all duration-200 hover:bg-red-400"
             >
               OK
             </button>
@@ -711,9 +711,9 @@ export default function ChatPage() {
       <ChatWindow />
 
       <div className="border-t border-subtle p-3 sm:p-6">
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:gap-4">
           <FilePicker key={filePickerKey} sessionId={sessionId} onFilesReady={setPendingFiles} disabled={isGenerating} />
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <div className="relative flex-1">
               <textarea
                 ref={inputRef}
@@ -722,7 +722,7 @@ export default function ChatPage() {
                 onKeyDown={handleKeyDown}
                 disabled={isGenerating}
                 placeholder={isGenerating ? "Tunggu hingga AI selesai merespon..." : "Ketik pesan..."}
-                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-4 py-3 sm:px-6 sm:py-4 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 lg:py-4 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ maxHeight: '240px' }}
               />
             </div>
@@ -730,23 +730,23 @@ export default function ChatPage() {
             {isGenerating ? (
               <button
                 onClick={stopGeneration}
-                className="flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/30 hover:text-red-300 border border-red-500/20"
+                className="flex size-10 md:size-12 lg:size-14 shrink-0 items-center justify-center rounded-2xl bg-red-500/20 text-red-400 transition-all duration-200 hover:bg-red-500/30 hover:text-red-300 border border-red-500/20"
               >
-                <Square size={16} className="fill-current" />
+                <Square className="size-4 md:size-[18px] fill-current" />
               </button>
             ) : (
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 sm:gap-2">
                 <button
                   onClick={sendMessage}
                   disabled={(!input.trim() && pendingFiles.length === 0) || isGenerating}
-                  className="flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl btn-gradient disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
+                  className="flex size-10 md:size-12 lg:size-14 shrink-0 items-center justify-center rounded-2xl btn-gradient disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none disabled:transform-none"
                 >
-                  <Send size={18} />
+                  <Send className="size-4 md:size-[18px]" />
                 </button>
                 <button
                   onClick={handleGenerate}
                   disabled={!canGenerate || generating}
-                  className={`flex size-11 md:size-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed ${
+                  className={`flex size-10 md:size-12 lg:size-14 shrink-0 items-center justify-center rounded-2xl transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed ${
                     canGenerate
                       ? mode === 'n8n'
                         ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20'
@@ -760,11 +760,11 @@ export default function ChatPage() {
                   }
                 >
                   {mode === 'n8n' ? (
-                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <svg className="size-4 md:size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                     </svg>
                   ) : (
-                    <FileText size={20} />
+                    <FileText className="size-4 md:size-5" />
                   )}
                 </button>
               </div>

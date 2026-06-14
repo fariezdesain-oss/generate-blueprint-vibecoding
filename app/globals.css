@@ -180,10 +180,10 @@ body {
 
   @media (max-width: 640px) {
     .input-gemini {
-      padding: 0.75rem 1rem;
+      padding: 0.625rem 0.875rem;
     }
     .card-gemini {
-      padding: 1rem;
+      padding: 0.75rem;
     }
   }
 

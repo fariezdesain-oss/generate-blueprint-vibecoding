@@ -167,33 +167,33 @@ export function ProviderSelector() {
   }
 
   return (
-    <div className="space-y-5 sm:space-y-8">
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {notification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className={`animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 text-center shadow-2xl ${
+          <div className={`animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-5 sm:p-6 text-center shadow-2xl ${
             notification.type === 'success'
               ? 'border-emerald-500/20'
               : 'border-red-500/20'
           }`}>
-            <div className={`mx-auto mb-4 flex size-14 items-center justify-center rounded-full ring-1 ${
+            <div className={`mx-auto mb-3 sm:mb-4 flex size-12 sm:size-14 items-center justify-center rounded-full ring-1 ${
               notification.type === 'success' ? 'bg-emerald-500/10 ring-emerald-500/20' : 'bg-red-500/10 ring-red-500/20'
             }`}>
               {notification.type === 'success' ? (
-                <svg className="size-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="size-5 sm:size-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                <svg className="size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="size-5 sm:size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
             </div>
-            <p className={`text-sm ${notification.type === 'success' ? 'text-emerald-300' : 'text-secondary'}`}>
+            <p className={`text-xs sm:text-sm ${notification.type === 'success' ? 'text-emerald-300' : 'text-secondary'}`}>
               {notification.message}
             </p>
             <button
               onClick={() => setNotification(null)}
-              className={`mt-5 w-full rounded-xl py-2.5 text-sm font-medium text-white transition-all duration-200 ${
+              className={`mt-4 sm:mt-5 w-full rounded-xl py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white transition-all duration-200 ${
                 notification.type === 'success' ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-red-500 hover:bg-red-400'
               }`}
             >
@@ -204,7 +204,7 @@ export function ProviderSelector() {
       )}
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-primary">Configured Providers</h2>
+        <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">Configured Providers</h2>
 
         {providers.length === 0 && (
           <p className="text-sm text-tertiary">
@@ -240,28 +240,28 @@ export function ProviderSelector() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEdit(p)}
-                    className="rounded-xl border border-subtle px-3 py-2 md:py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
+                    className="rounded-xl border border-subtle px-2.5 sm:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleTestSaved(p.id)}
                     disabled={testingProviderId === p.id}
-                    className="rounded-xl border border-subtle px-3 py-2 md:py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
+                    className="rounded-xl border border-subtle px-2.5 sm:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
                   >
                     {testingProviderId === p.id ? 'Testing...' : 'Test'}
                   </button>
                 {!p.is_active && (
                   <button
                     onClick={() => handleActivate(p.id)}
-                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-4 py-2 md:py-1.5 text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-3 sm:px-4 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
                   >
                     Activate
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="rounded-xl bg-red-500/10 px-4 py-2 md:py-1.5 text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
+                    className="rounded-xl bg-red-500/10 px-3 sm:px-4 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
                 >
                   Delete
                 </button>
@@ -272,7 +272,7 @@ export function ProviderSelector() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-4 card-gemini p-4 sm:p-6">
-        <h2 className="text-lg font-semibold text-primary">Add Provider</h2>
+        <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">Add Provider</h2>
 
         <div>
           <label className="mb-1.5 block text-sm text-secondary">Provider</label>

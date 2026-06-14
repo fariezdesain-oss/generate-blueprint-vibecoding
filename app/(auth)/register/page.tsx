@@ -91,15 +91,15 @@ export default function RegisterPage() {
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
         <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
           <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
-            <div className="mb-6 sm:mb-8 text-center">
-              <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
+            <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
+              <div className="mx-auto mb-3 sm:mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
                 <Mail className="size-5 sm:size-6 lg:size-7 text-gemini-orange" />
               </div>
-              <h1 className="text-gradient text-xl sm:text-2xl font-bold">Cek Email Anda</h1>
-              <p className="mt-2 text-sm text-white/40">
+              <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">Cek Email Anda</h1>
+              <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-white/40">
                 Kami telah mengirim link verifikasi ke:
               </p>
-              <p className="mt-1 text-sm font-medium text-white/80 truncate">{successEmail}</p>
+              <p className="mt-1 text-xs sm:text-sm font-medium text-white/80 truncate">{successEmail}</p>
             </div>
 
             <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-4">
@@ -142,7 +142,7 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <p className="mt-6 text-center text-sm text-white/40">
+          <p className="mt-5 sm:mt-6 text-center text-xs sm:text-sm text-white/40">
               Sudah verifikasi?{' '}
               <a
                 href="/login"
@@ -161,12 +161,12 @@ export default function RegisterPage() {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
         <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
-          <div className="mb-6 sm:mb-8 text-center">
-            <div className="mx-auto mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
+          <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
+            <div className="mx-auto mb-3 sm:mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-orange/20 to-gemini-red/20 ring-1 ring-white/10">
               <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-orange" />
             </div>
-            <h1 className="text-gradient text-xl sm:text-2xl font-bold">Buat Akun</h1>
-            <p className="mt-1 text-sm text-white/40">Daftar untuk mulai menggunakan</p>
+            <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">Buat Akun</h1>
+            <p className="mt-1 text-xs sm:text-sm text-white/40">Daftar untuk mulai menggunakan</p>
           </div>
 
           {error && (
@@ -175,7 +175,7 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-4">
+          <form onSubmit={handleRegister} className="space-y-3 sm:space-y-4">
             <div>
               <label className="mb-1.5 block text-sm text-white/60">Email</label>
               <input

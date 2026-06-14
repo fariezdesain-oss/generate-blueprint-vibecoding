@@ -345,7 +345,7 @@ export default function GenerateResultsPage() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <div className="size-6 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+        <div className="size-5 sm:size-6 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
       </div>
     );
   }
@@ -353,14 +353,14 @@ export default function GenerateResultsPage() {
   if (isN8n) {
     if (!n8nData) {
       return (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 animate-float">
-          <div className="flex size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
-            <Workflow size={32} className="text-tertiary" />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
+          <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+            <Workflow className="size-6 sm:size-8 text-tertiary" />
           </div>
-          <p className="text-lg text-tertiary">Belum ada n8n workflow untuk sesi ini</p>
+          <p className="text-sm sm:text-lg text-tertiary">Belum ada n8n workflow untuk sesi ini</p>
           <button
             onClick={() => router.push('/chat')}
-            className="btn-gradient px-6 py-2.5 text-sm"
+            className="btn-gradient px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm"
           >
             Kembali ke Chat
           </button>
@@ -373,15 +373,15 @@ export default function GenerateResultsPage() {
 
     return (
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between border-b border-subtle px-6 py-5">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-subtle px-4 sm:px-6 py-3 sm:py-5 gap-2 sm:gap-0">
           <div>
-            <h1 className="text-gradient text-2xl font-extrabold">n8n Workflow</h1>
-            <p className="mt-1 text-xs font-semibold text-tertiary">Generated berdasarkan percakapan Anda</p>
+            <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-extrabold">n8n Workflow</h1>
+            <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-semibold text-tertiary">Generated berdasarkan percakapan Anda</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
             <button
               onClick={() => router.push('/chat')}
-              className="rounded-xl border border-subtle px-5 py-2.5 text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+              className="rounded-xl border border-subtle px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
             >
               Back to Chat
             </button>
@@ -389,17 +389,19 @@ export default function GenerateResultsPage() {
               <>
                 <button
                   onClick={() => handleCopy(jsonStr, 'n8n')}
-                  className="flex items-center gap-2 rounded-xl border border-subtle px-4 py-2.5 text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-subtle px-3 sm:px-4 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                 >
-                  <Copy size={16} />
-                  {copied === 'n8n' ? 'Copied!' : 'Copy'}
+                  <Copy className="size-3 sm:size-4" />
+                  <span className="hidden sm:inline">{copied === 'n8n' ? 'Copied!' : 'Copy'}</span>
+                  <span className="sm:hidden">{copied === 'n8n' ? 'Copied!' : 'Copy'}</span>
                 </button>
                 <button
                   onClick={() => handleDownload(jsonStr, 'n8n-workflow.json')}
-                  className="btn-gradient flex items-center gap-2 px-5 py-2.5 text-sm font-semibold"
+                  className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold"
                 >
-                  <Download size={16} />
-                  Download .json
+                  <Download className="size-3 sm:size-4" />
+                  <span className="hidden sm:inline">Download .json</span>
+                  <span className="sm:hidden">.json</span>
                 </button>
               </>
             )}
@@ -407,10 +409,10 @@ export default function GenerateResultsPage() {
         </div>
 
         {hasSetup && (
-          <div className="flex border-b border-subtle px-6">
+          <div className="flex border-b border-subtle px-4 sm:px-6 overflow-x-auto">
             <button
               onClick={() => setN8nTab('json')}
-              className={`border-b-2 px-5 py-3 text-sm font-bold transition-all duration-200 ${
+              className={`shrink-0 border-b-2 px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-bold transition-all duration-200 ${
                 n8nTab === 'json'
                   ? 'border-gemini-blue text-gemini-blue'
                   : 'border-transparent text-tertiary hover:text-secondary'
@@ -420,7 +422,7 @@ export default function GenerateResultsPage() {
             </button>
             <button
               onClick={() => setN8nTab('setup')}
-              className={`border-b-2 px-5 py-3 text-sm font-bold transition-all duration-200 ${
+              className={`shrink-0 border-b-2 px-3 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-bold transition-all duration-200 ${
                 n8nTab === 'setup'
                   ? 'border-emerald-400 text-emerald-400'
                   : 'border-transparent text-tertiary hover:text-secondary'
@@ -431,7 +433,7 @@ export default function GenerateResultsPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
           {n8nTab === 'json' ? (
             <>
               <button
@@ -449,15 +451,15 @@ export default function GenerateResultsPage() {
             </>
           ) : (
             <div className="mx-auto max-w-3xl">
-              <div className="mb-6 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
-                  <svg className="size-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 sm:px-5 py-3 sm:py-4">
+                <div className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
+                  <svg className="size-4 sm:size-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-primary">Yang Perlu Disetup</p>
-                  <p className="text-xs text-tertiary">Ikuti panduan di bawah agar workflow berjalan dengan semestinya</p>
+                  <p className="text-xs sm:text-sm font-bold text-primary">Yang Perlu Disetup</p>
+                  <p className="text-[10px] sm:text-xs text-tertiary">Ikuti panduan di bawah agar workflow berjalan dengan semestinya</p>
                 </div>
               </div>
               <div className="prose prose-invert max-w-none text-sm leading-relaxed text-primary">
@@ -472,14 +474,14 @@ export default function GenerateResultsPage() {
 
   if (!data) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 animate-float">
-        <div className="flex size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
-          <FileText size={32} className="text-tertiary" />
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
+        <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+          <FileText className="size-6 sm:size-8 text-tertiary" />
         </div>
-        <p className="text-lg text-tertiary">Belum ada hasil generate untuk sesi ini</p>
+        <p className="text-sm sm:text-lg text-tertiary">Belum ada hasil generate untuk sesi ini</p>
         <button
           onClick={() => router.push('/chat')}
-          className="btn-gradient px-6 py-2.5 text-sm"
+          className="btn-gradient px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm"
         >
           Kembali ke Chat
         </button>
@@ -492,31 +494,59 @@ export default function GenerateResultsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-subtle px-6 py-5">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-subtle px-4 sm:px-6 py-3 sm:py-5 gap-2 sm:gap-0">
         <div>
-          <h1 className="text-gradient text-2xl font-extrabold">Generated Documentation</h1>
-          <p className="mt-1 text-xs font-semibold text-tertiary">{generatedCount} / {FILE_ORDER.length} files generated</p>
+          <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-extrabold">Generated Documentation</h1>
+          <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-semibold text-tertiary">{generatedCount} / {FILE_ORDER.length} files generated</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
           <button
             onClick={() => router.push(`/chat?id=${sessionId}`)}
-            className="rounded-xl border border-subtle px-5 py-2.5 text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+            className="rounded-xl border border-subtle px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
           >
             Back to Chat
           </button>
           <button
             onClick={handleDownloadAll}
-            className="btn-gradient flex items-center gap-2 px-5 py-2.5 text-sm font-semibold"
+            className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold"
           >
-            <Archive size={16} />
-            Download All (.zip)
+            <Archive className="size-3 sm:size-4" />
+            <span className="hidden sm:inline">Download All (.zip)</span>
+            <span className="sm:hidden">.zip</span>
           </button>
         </div>
       </div>
 
+      {/* Mobile: horizontal file selector row */}
+      <div className="flex md:hidden overflow-x-auto border-b border-subtle px-3 sm:px-4 py-2 gap-1.5">
+        {FILE_ORDER.map((name) => {
+          const hasFile = name in files;
+          const isRegenerating = regenerating === name;
+          const isActive = activeFile === name;
+          return (
+            <button
+              key={name}
+              onClick={() => hasFile && !isRegenerating && setActiveFile(name)}
+              disabled={!hasFile || isRegenerating}
+              className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+                isActive && hasFile
+                  ? 'bg-gemini-blue/10 text-gemini-blue border border-gemini-blue/20'
+                  : hasFile
+                    ? 'bg-tertiary text-secondary border border-subtle hover:bg-tertiary hover:text-primary'
+                    : 'bg-tertiary/50 text-tertiary border border-subtle'
+              }`}
+            >
+              {name}
+              {!hasFile && !isRegenerating && <span className="ml-1 text-[10px]">—</span>}
+              {isRegenerating && <span className="ml-1.5 inline-block size-2 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        <div className="w-72 overflow-y-auto border-r border-subtle p-5">
-          <div className="space-y-1.5">
+        <div className="hidden md:block w-60 lg:w-72 overflow-y-auto border-r border-subtle p-4 lg:p-5">
+          <div className="space-y-1">
             {FILE_ORDER.map((name) => {
               const hasFile = name in files;
               const isRegenerating = regenerating === name;
@@ -526,7 +556,7 @@ export default function GenerateResultsPage() {
                   key={name}
                   onClick={() => hasFile && !isRegenerating && setActiveFile(name)}
                   disabled={!hasFile || isRegenerating}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm transition-all duration-200 ${
+                  className={`flex w-full items-center gap-2.5 lg:gap-3 rounded-xl px-2.5 lg:px-3 py-2 lg:py-3 text-left text-xs lg:text-sm transition-all duration-200 ${
                     isActive && hasFile
                       ? 'card-gemini-active text-gemini-blue font-bold'
                       : hasFile
@@ -534,12 +564,12 @@ export default function GenerateResultsPage() {
                         : 'text-tertiary font-semibold'
                   }`}
                 >
-                  <FileText size={16} />
+                  <FileText className="size-3.5 lg:size-4 shrink-0" />
                   <span className="truncate">{name}</span>
                   {isRegenerating && (
                     <span className="ml-auto size-3 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />
                   )}
-                  {!hasFile && !isRegenerating && <span className="ml-auto text-[11px] font-bold text-tertiary">—</span>}
+                  {!hasFile && !isRegenerating && <span className="ml-auto text-[10px] lg:text-[11px] font-bold text-tertiary">—</span>}
                 </button>
               );
             })}
@@ -549,48 +579,48 @@ export default function GenerateResultsPage() {
         <div className="flex flex-1 flex-col overflow-hidden">
           {files[activeFile] ? (
             <>
-              <div className="flex items-center justify-between border-b border-subtle px-6 py-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-subtle px-4 sm:px-6 py-3 sm:py-4 gap-2 sm:gap-0">
                 <div>
-                  <h2 className="text-base font-extrabold text-primary">{activeFile}</h2>
-                  <p className="text-[11px] font-semibold text-tertiary">{FILE_LABELS[activeFile] || ''}</p>
+                  <h2 className="text-sm sm:text-base font-extrabold text-primary">{activeFile}</h2>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-tertiary">{FILE_LABELS[activeFile] || ''}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 self-end sm:self-auto">
                   <button
                     onClick={() => handleRegenerate(activeFile)}
                     disabled={regenerating !== null}
-                    className="flex items-center gap-2 rounded-xl border border-subtle px-4 py-2 text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-40"
+                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-40"
                   >
-                    <RefreshCw size={14} className={regenerating === activeFile ? 'animate-spin text-gemini-blue' : ''} />
-                    {regenerating === activeFile ? 'Regenerating...' : 'Regenerate'}
+                    <RefreshCw className="size-3 sm:size-3.5" />
+                    <span className="hidden sm:inline">{regenerating === activeFile ? 'Regenerating...' : 'Regenerate'}</span>
                   </button>
                   <button
                     onClick={() => handleCopy(files[activeFile], activeFile)}
-                    className="flex items-center gap-2 rounded-xl border border-subtle px-4 py-2 text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                   >
-                    <Copy size={14} />
+                    <Copy className="size-3 sm:size-3.5" />
                     {copied === activeFile ? 'Copied!' : 'Copy'}
                   </button>
                   <button
                     onClick={() => handleDownload(files[activeFile], activeFile)}
-                    className="flex items-center gap-2 rounded-xl border border-subtle px-4 py-2 text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                   >
-                    <Download size={14} />
+                    <Download className="size-3 sm:size-3.5" />
                     Download
                   </button>
                 </div>
               </div>
-              <div ref={contentRef} className="flex-1 overflow-y-auto p-8">
-                <pre className="whitespace-pre-wrap font-mono text-sm font-semibold leading-loose text-primary">
+              <div ref={contentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+                <pre className="whitespace-pre-wrap font-mono text-xs sm:text-sm font-semibold leading-loose text-primary">
                   {files[activeFile]}
                 </pre>
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-4 animate-float">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
-                <Sparkles className="size-8 text-tertiary" />
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+                <Sparkles className="size-6 sm:size-8 text-tertiary" />
               </div>
-              <p className="text-lg text-tertiary">File not available</p>
+              <p className="text-sm sm:text-lg text-tertiary">File not available</p>
             </div>
           )}
         </div>
