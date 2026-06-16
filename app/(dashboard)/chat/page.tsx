@@ -41,7 +41,6 @@ export default function ChatPage() {
   const setMode = useChatStore((s) => s.setMode);
   const titleSet = useRef(false);
   const activeSessionRef = useRef<string | null>(null);
-  const skipLoadRef = useRef(false);
 
   useEffect(() => {
     if (chatError) {
@@ -88,6 +87,7 @@ export default function ChatPage() {
   useEffect(() => {
     const init = async () => {
       if (sessionIdUrlParam) {
+        setLoading(true);
         try {
           const check = await fetch(`/api/chat?session_id=${sessionIdUrlParam}`);
           if (!check.ok) {
@@ -102,12 +102,15 @@ export default function ChatPage() {
             setShowModePicker(false);
             setSessionId(sessionIdUrlParam);
             sessionStorage.setItem('activeSessionId', sessionIdUrlParam);
+            return;
           }
         } catch {
           sessionStorage.removeItem('activeSessionId');
           useChatStore.getState().reset();
           router.replace('/chat');
+          return;
         }
+        setLoading(false);
         return;
       }
 
@@ -145,11 +148,10 @@ export default function ChatPage() {
       });
       const json = await res.json();
       if (json.success) {
-        skipLoadRef.current = true;
-        setSessionId(json.data.session.id);
-        setSessionTitle('New Chat');
-        sessionStorage.setItem('activeSessionId', json.data.session.id);
-        useChatStore.getState().bumpSidebar();
+          setSessionId(json.data.session.id);
+          setSessionTitle('New Chat');
+          sessionStorage.setItem('activeSessionId', json.data.session.id);
+          useChatStore.getState().bumpSidebar();
       }
     } catch {
       setShowModePicker(true);
@@ -163,12 +165,6 @@ export default function ChatPage() {
     titleSet.current = false;
     activeSessionRef.current = sessionId;
     setLoading(true);
-
-    if (skipLoadRef.current) {
-      skipLoadRef.current = false;
-      setLoading(false);
-      return;
-    }
 
     const targetId = sessionId;
     const abort = new AbortController();
@@ -257,7 +253,6 @@ export default function ChatPage() {
         });
         const json = await res.json();
         if (json.success) {
-          skipLoadRef.current = true;
           setSessionId(json.data.session.id);
           setSessionTitle('New Chat');
           sessionStorage.setItem('activeSessionId', json.data.session.id);

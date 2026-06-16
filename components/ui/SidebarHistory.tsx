@@ -20,7 +20,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [navigating, setNavigating] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const sidebarVersion = useChatStore((s) => s.sidebarVersion);
@@ -106,7 +105,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
               <div
                 key={s.id}
                 onClick={() => {
-                  setNavigating(true);
                   onItemClick?.();
                   router.push(`/chat?id=${s.id}`);
                 }}
@@ -131,7 +129,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setNavigating(true);
                       onItemClick?.();
                       const modeParam = s.has_n8n ? '&mode=n8n' : '';
                       router.push(`/generate/results?session_id=${s.id}${modeParam}`);
@@ -151,15 +148,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {navigating && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3">
-            <div className="size-8 rounded-full border-2 border-white/20 border-t-gemini-blue animate-spin" />
-            <p className="text-sm text-white/70">Memuat...</p>
-          </div>
         </div>
       )}
 

@@ -215,6 +215,7 @@ export default function GenerateResultsPage() {
 
   const loadFiles = useCallback(async () => {
     if (!sessionId) {
+      setLoading(false);
       router.replace('/chat');
       return;
     }
@@ -276,6 +277,7 @@ export default function GenerateResultsPage() {
   }, [sessionId, router, isN8n]);
 
   useEffect(() => {
+    setLoading(true);
     loadFiles();
   }, [loadFiles]);
 
