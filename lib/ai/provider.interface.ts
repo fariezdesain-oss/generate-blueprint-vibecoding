@@ -3,6 +3,7 @@ export interface AIProviderConfig {
   apiKey: string;
   modelName: string;
   baseUrl?: string;
+  maxTokens?: number;
 }
 
 export interface ContentFile {

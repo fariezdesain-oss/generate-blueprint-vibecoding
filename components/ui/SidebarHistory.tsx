@@ -114,7 +114,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                     : 'text-tertiary font-semibold hover:bg-tertiary hover:text-secondary'
                 }`}
               >
-                <span className="shrink-0 text-xs">{s.mode === 'n8n' ? '⚙️' : '📄'}</span>
                 <span className="flex-1 truncate">{s.title}</span>
                 {s.has_generated && (
                   <span className="shrink-0 rounded-full bg-gradient-to-r from-gemini-blue/20 to-gemini-blue/20 px-2.5 py-0.5 text-[10px] font-bold text-gemini-blue">
@@ -133,7 +132,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                       const modeParam = s.has_n8n ? '&mode=n8n' : '';
                       router.push(`/generate/results?session_id=${s.id}${modeParam}`);
                     }}
-                    className="shrink-0 rounded-lg p-1.5 opacity-0 transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal group-hover:opacity-100"
+                    className="shrink-0 rounded-lg p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal md:group-hover:opacity-100"
                     title={s.has_n8n ? 'View n8n Workflow' : 'View Docs'}
                   >
                     <FileText size={12} />
@@ -141,7 +140,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                 )}
                 <button
                   onClick={(e) => handleDeleteClick(s, e)}
-                  className="shrink-0 rounded-lg p-1.5 opacity-0 transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100"
+                  className="shrink-0 rounded-lg p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 md:group-hover:opacity-100"
                 >
                   <X size={12} />
                 </button>

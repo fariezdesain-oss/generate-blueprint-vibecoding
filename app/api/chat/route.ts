@@ -285,6 +285,7 @@ export async function POST(req: Request) {
     apiKey: providerConfig?.apiKey || '',
     modelName: providerConfig?.modelName || 'gemini-2.5-flash',
     baseUrl: providerConfig?.baseUrl,
+    maxTokens: 32000,
   };
 
   const { data: history } = await supabase

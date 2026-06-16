@@ -76,6 +76,7 @@ export async function POST(req: Request) {
     apiKey: decryptedKey || '',
     modelName: providerConfig?.model_name || 'gemini-2.5-flash',
     baseUrl: providerConfig?.base_url || undefined,
+    maxTokens: 32000,
   };
 
   if (!aiConfig.apiKey) {

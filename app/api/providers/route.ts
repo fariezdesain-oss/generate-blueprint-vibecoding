@@ -76,7 +76,8 @@ export async function POST(req: Request) {
     .select('id')
     .eq('user_id', userData.user.id)
     .eq('provider_name', provider_name)
-    .single();
+    .eq('model_name', model_name)
+    .maybeSingle();
 
   if (existing) {
     const { data, error } = await supabase
@@ -162,6 +163,7 @@ export async function PUT(req: Request) {
     .update({ ...updateData, updated_at: new Date().toISOString() })
     .eq('user_id', userData.user.id)
     .eq('provider_name', provider_name)
+    .eq('model_name', model_name)
     .select('id, provider_name, model_name, is_active, created_at, updated_at')
     .single();
 

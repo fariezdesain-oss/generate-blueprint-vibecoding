@@ -49,12 +49,15 @@ export class OpenAICompatibleProvider implements AIProvider {
     const baseUrl = this.getBaseUrl(config);
     const content = buildOpenAIContent(prompt, files);
 
+    const maxTokens = config.maxTokens ?? 32000;
+
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.buildHeaders(config),
       body: JSON.stringify({
         model: config.modelName,
         messages: [{ role: 'user', content }],
+        max_tokens: maxTokens,
       }),
     });
 
@@ -76,6 +79,8 @@ export class OpenAICompatibleProvider implements AIProvider {
     const baseUrl = this.getBaseUrl(config);
     const content = buildOpenAIContent(prompt, files);
 
+    const maxTokens = config.maxTokens ?? 32000;
+
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.buildHeaders(config),
@@ -83,6 +88,7 @@ export class OpenAICompatibleProvider implements AIProvider {
         model: config.modelName,
         messages: [{ role: 'user', content }],
         stream: true,
+        max_tokens: maxTokens,
       }),
       signal,
     });
