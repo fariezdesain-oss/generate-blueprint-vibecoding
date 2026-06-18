@@ -51,6 +51,13 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const generateCooldownRef = useRef(false);
   const regenerateRequestedRef = useRef(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     regenerateRequestedRef.current = false;
@@ -378,63 +385,58 @@ export default function ChatPage() {
     abortRef.current?.abort();
   };
 
-  const handleGenerate = async () => {
-    if (!sessionId || generating || generateCooldownRef.current) return;
+  const pollStartRef = useRef(0);
 
-    if (mode === 'n8n') {
-      const checkRes = await fetch(`/api/sessions/${sessionId}/files`);
-      const hasExisting = checkRes.ok;
-      const shouldRegenerate = regenerateRequestedRef.current;
-      regenerateRequestedRef.current = false;
+  function stopPolling() {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = null;
+    setGenerating(false);
+    generateCooldownRef.current = true;
+    setTimeout(() => { generateCooldownRef.current = false; }, 2000);
+  }
 
-      if (hasExisting && !shouldRegenerate) {
-        router.push(`/generate/results?session_id=${sessionId}&mode=n8n`);
+  const pollForResults = (mode: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollStartRef.current = Date.now();
+
+    pollingRef.current = setInterval(async () => {
+      if (Date.now() - pollStartRef.current > 900000) {
+        stopPolling();
+        setChatError('Generate melebihi batas waktu 15 menit. Silakan coba lagi.');
         return;
       }
 
-      if (hasExisting && shouldRegenerate) {
-        await fetch(`/api/sessions/${sessionId}/files`, { method: 'DELETE' }).catch(() => {});
-      }
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}/files`);
+        const json = await res.json();
+        if (!json.success) return;
 
-      setGenerating(true);
-      setChatError(null);
-
-      let attempts = 0;
-      const maxRetries = 2;
-      while (attempts <= maxRetries) {
-        attempts++;
-        try {
-          const res = await fetch('/api/generate/n8n', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId }),
-          });
-          const json = await res.json();
-          if (json.success) {
-            setGenerating(false);
-            generateCooldownRef.current = true;
-            setTimeout(() => { generateCooldownRef.current = false; }, 2000);
+        if (mode === 'n8n') {
+          if (json.data.n8n_workflow) {
+            stopPolling();
             router.push(`/generate/results?session_id=${sessionId}&mode=n8n`);
-            return;
           }
-          if (attempts > maxRetries) {
-            setChatError(json?.error?.message || 'Gagal generate n8n workflow setelah beberapa percobaan');
-            break;
+        } else {
+          const files = json.data.files;
+          if (files) {
+            const count = Object.keys(files).length;
+            const fileName = count < FILE_ORDER.length ? FILE_ORDER[count] : '';
+            setGenProgress({ current: Math.min(count, FILE_ORDER.length), total: FILE_ORDER.length, fileName });
+
+            if (count >= FILE_ORDER.length) {
+              stopPolling();
+              router.push(`/generate/results?session_id=${sessionId}`);
+            }
           }
-          await new Promise((r) => setTimeout(r, 3000 * attempts));
-        } catch {
-          if (attempts > maxRetries) {
-            setChatError('Gagal terhubung ke server. Silakan coba lagi.');
-            break;
-          }
-          await new Promise((r) => setTimeout(r, 3000 * attempts));
         }
+      } catch {
+        // polling error, will retry on next interval
       }
-      setGenerating(false);
-      generateCooldownRef.current = true;
-      setTimeout(() => { generateCooldownRef.current = false; }, 2000);
-      return;
-    }
+    }, 2000);
+  };
+
+  const handleGenerate = async () => {
+    if (!sessionId || generating || generateCooldownRef.current) return;
 
     const shouldRegenerate = regenerateRequestedRef.current;
     regenerateRequestedRef.current = false;
@@ -445,14 +447,25 @@ export default function ChatPage() {
 
     const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
     let existingCount = 0;
+    let hasN8nExisting = false;
     if (filesRes.ok) {
       const filesJson = await filesRes.json();
-      if (filesJson.success && filesJson.data.files) {
-        existingCount = Object.keys(filesJson.data.files).length;
+      if (filesJson.success) {
+        if (mode === 'n8n' && filesJson.data.n8n_workflow) {
+          hasN8nExisting = true;
+        }
+        if (mode !== 'n8n' && filesJson.data.files) {
+          existingCount = Object.keys(filesJson.data.files).length;
+        }
       }
     }
 
-    if (existingCount >= FILE_ORDER.length && !shouldRegenerate) {
+    if (mode === 'n8n' && hasN8nExisting && !shouldRegenerate) {
+      router.push(`/generate/results?session_id=${sessionId}&mode=n8n`);
+      return;
+    }
+
+    if (mode !== 'n8n' && existingCount >= FILE_ORDER.length && !shouldRegenerate) {
       router.push(`/generate/results?session_id=${sessionId}`);
       return;
     }
@@ -461,61 +474,26 @@ export default function ChatPage() {
     setChatError(null);
     setGenProgress({ current: existingCount, total: FILE_ORDER.length, fileName: '' });
 
-    try {
-      let previewLimit = existingCount > 2 ? 2000 : 0;
-      const RETRY_CODES = ['AI_SERVICE_BUSY', 'AI_PAYMENT_REQUIRED', 'AI_CONTEXT_OVERFLOW', 'AI_GENERATION_FAILED'];
+    // Mulai polling dulu sebelum POST agar progress bar real-time
+    pollForResults(mode);
 
-      for (let i = existingCount; i < FILE_ORDER.length; i++) {
-        const fileName = FILE_ORDER[i];
-        let attempts = 0;
-        const maxRetries = 2;
-
-        while (attempts <= maxRetries) {
-          attempts++;
-          setGenProgress({ current: i + 1, total: FILE_ORDER.length, fileName });
-
-          const res = await fetch('/api/generate/sequential', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: sessionId, file_index: i, preview_limit: previewLimit }),
-          });
-
-          const json = await res.json();
-          if (json.success) {
-            await new Promise((r) => setTimeout(r, 1500));
-            break;
-          }
-
-          if (json?.error?.code === 'AI_CONTEXT_OVERFLOW' && previewLimit < 3000) {
-            previewLimit = 3000;
-          }
-
-          const isRetryable = RETRY_CODES.includes(json?.error?.code);
-          if (isRetryable && attempts <= maxRetries) {
-            await new Promise((r) => setTimeout(r, 5000 * attempts));
-            continue;
-          }
-
-          const errorMsg = json?.error?.message || `Gagal generate ${fileName}`;
-          setChatError(
-            `Gagal generate ${fileName}. File sebelumnya (${i} dari ${FILE_ORDER.length}) sudah tersimpan. Klik Generate lagi untuk melanjutkan. ${errorMsg}`,
-          );
-          if (json?.error?.code === 'INSUFFICIENT_CONTEXT') {
-            setCanGenerate(false);
-          }
-          setGenerating(false);
-          return;
+    // Fire-and-forget: POST tidak di-await
+    fetch('/api/generate/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, mode }),
+    })
+      .then(res => res.json())
+      .then(json => {
+        if (!json.success) {
+          stopPolling();
+          setChatError(json?.error?.message || 'Gagal memulai generate. Silakan coba lagi.');
         }
-      }
-
-      router.push(`/generate/results?session_id=${sessionId}`);
-    } catch {
-      setChatError('Generation request failed. File yang sudah tergenerate sebelumnya tetap aman. Klik Generate lagi untuk melanjutkan.');
-    } finally {
-      setGenerating(false);
-      generateCooldownRef.current = true;
-      setTimeout(() => { generateCooldownRef.current = false; }, 2000);
-    }
+      })
+      .catch(() => {
+        stopPolling();
+        setChatError('Gagal terhubung ke server. Silakan coba lagi.');
+      });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

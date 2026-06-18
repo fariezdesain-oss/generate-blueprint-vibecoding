@@ -41,10 +41,10 @@ export async function GET(
   const hasDocs = !!session.generated_files && typeof session.generated_files === 'object';
 
   if (!hasDocs && !hasN8n) {
-    return NextResponse.json(
-      { success: false, error: { code: 'NOT_GENERATED', message: 'No generated files for this session' } },
-      { status: 404 },
-    );
+    return NextResponse.json({
+      success: true,
+      data: { files: null, generated_at: null },
+    });
   }
 
   const result: Record<string, unknown> = {};
