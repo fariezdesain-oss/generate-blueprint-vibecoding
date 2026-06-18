@@ -87,7 +87,7 @@ function autoFixWorkflow(workflow: Record<string, unknown>): { workflow: Record<
 }
 
 async function processSequential(
-  supabaseAdmin: ReturnType<typeof createSupabaseClient>,
+  supabaseAdmin: any,
   sessionId: string,
   messages: { role: string; content: string }[],
   aiConfig: AIProviderConfig,
@@ -139,7 +139,7 @@ async function processSequential(
 }
 
 async function processN8nSync(
-  supabaseAdmin: ReturnType<typeof createSupabaseClient>,
+  supabaseAdmin: any,
   sessionId: string,
   messages: { role: string; content: string }[],
   aiConfig: AIProviderConfig,
