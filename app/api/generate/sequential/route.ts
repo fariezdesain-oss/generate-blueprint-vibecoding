@@ -7,6 +7,30 @@ import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, FILE_ORDER } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 
+async function retryAI(
+  provider: any,
+  prompt: string,
+  config: AIProviderConfig,
+  maxAttempts: number = 3,
+): Promise<string> {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await provider.generateChat(prompt, config);
+    } catch (err: any) {
+      if (attempt < maxAttempts - 1) {
+        const msg = err?.message || '';
+        const isRateLimit = msg.includes('quota') || msg.includes('rate') || msg.includes('429');
+        const delay = isRateLimit ? 30000 * (attempt + 1) : 2000 * Math.pow(2, attempt);
+        console.log(`AI retry ${attempt + 1}/${maxAttempts} after ${delay}ms: ${msg.slice(0, 100)}`);
+        await new Promise(r => setTimeout(r, delay));
+      } else {
+        throw err;
+      }
+    }
+  }
+  throw new Error('AI call failed after all retries');
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -105,7 +129,7 @@ export async function POST(req: Request) {
       );
     }
 
-    let aiResponse = await provider.generateChat(prompt, aiConfig);
+    let aiResponse = await retryAI(provider, prompt, aiConfig, 3);
 
     const fileName = FILE_ORDER[file_index];
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
@@ -121,7 +145,7 @@ export async function POST(req: Request) {
     const hasPlaceholder = placeholderPatterns.some(p => p.test(fileContent));
     if (hasPlaceholder) {
       const correctionPrompt = `${prompt}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
-      aiResponse = await provider.generateChat(correctionPrompt, aiConfig);
+      aiResponse = await retryAI(provider, correctionPrompt, aiConfig, 2);
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 

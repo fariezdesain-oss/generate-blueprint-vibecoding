@@ -83,28 +83,75 @@ function formatConversation(messages) {
   return messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
 }
 
-function formatPreviousFiles(files, previewLimit) {
+function formatPRDFull(files) {
+  const prdContent = files ? files['PRD.md'] : null;
+  if (!prdContent) return '';
+  return `--- PRD.md (ACUAN UTAMA — LENGKAP) ---\n${prdContent}`;
+}
+
+function formatOtherFiles(files, previewLimit) {
   const entries = files ? Object.entries(files) : [];
-  return entries.map(([name, content]) => {
+  return entries
+    .filter(([name]) => name !== 'PRD.md')
+    .map(([name, content]) => {
     const text = previewLimit > 0 && content.length > previewLimit
       ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk menghemat konteks]'
       : content;
-    return `--- ${name} ---\n${text}`;
+    return `--- ${name} (REFERENSI) ---\n${text}`;
   }).join('\n\n');
 }
 
 const BASE_SYSTEM = `Anda adalah senior software architect dan technical writer. Output Anda harus presisi, terstruktur, dan lengkap. WAJIB GUNAKAN BAHASA INDONESIA.
 
 ATURAN KUALITAS:
-1. KONSISTENSI — semua dokumen dalam satu proyek HARUS konsisten satu sama lain. Jangan kontradiksi dengan dokumen sebelumnya. Jika ada perbedaan, sesuaikan dengan dokumen yang sudah ada.
+1. KONSISTENSI — semua dokumen dalam satu proyek HARUS konsisten satu sama lain. PRD.md adalah ACUAN UTAMA. Jangan kontradiksi dengan PRD.md. Jika ada perbedaan, sesuaikan dengan PRD.md.
 2. DILARANG placeholder — jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 3. LENGKAP — setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
 4. SPESIFIK — gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".`;
 
+function buildConsistencyPrompt(files) {
+  const prdContent = files ? files['PRD.md'] : null;
+  if (!prdContent) return '';
+
+  const otherEntries = files ? Object.entries(files).filter(([name]) => name !== 'PRD.md') : [];
+
+  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI dokumen spesifikasi proyek berikut.
+
+PRD.md adalah ACUAN UTAMA yang HARUS diikuti oleh SEMUA dokumen lainnya.
+
+Tugas Anda:
+1. Baca PRD.md (ACUAN UTAMA)
+2. Baca dokumen lainnya
+3. Periksa apakah ada KONTRADIKSI atau KETIDAKSESUAIAN dengan PRD.md
+4. Jika SEMUA konsisten → balas hanya dengan teks: SEMUA KONSISTEN
+5. Jika ada yang perlu diperbaiki → keluarkan ULANG file yang bermasalah LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md"
+
+--- PRD.md (ACUAN UTAMA - LENGKAP) ---
+${prdContent}
+
+`;
+
+  for (const [name, content] of otherEntries) {
+    prompt += `\n--- ${name} ---\n${content}\n`;
+  }
+
+  prompt += `\n\nSETELAH memeriksa, jika SEMUA KONSISTEN balas "SEMUA KONSISTEN". Jika ada yang kontradiksi, keluarkan ULANG file tersebut LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md".`;
+
+  return prompt;
+}
+
 function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit) {
   const fileName = FILE_ORDER[fileIndex];
   const conversation = formatConversation(messages);
-  const previousContent = formatPreviousFiles(previousFiles, previewLimit);
+  const prdSection = formatPRDFull(previousFiles);
+  const otherSection = formatOtherFiles(previousFiles, previewLimit);
+
+  let contextSection = '';
+  if (prdSection || otherSection) {
+    contextSection = '\n\nREFERENSI DOKUMEN SEBELUMNYA:\n\n';
+    if (prdSection) contextSection += prdSection + '\n';
+    if (otherSection) contextSection += '\n' + otherSection;
+  }
 
   let filePrompt = '';
 
@@ -127,10 +174,7 @@ Tulis konten LENGKAP dan SPESIFIK untuk setiap bagian. Jangan gunakan placeholde
       break;
 
     case 'ARCHITECTURE.md':
-      filePrompt = `Buat dokumen ARCHITECTURE.md (System Architecture Document) berdasarkan deskripsi proyek dari percakapan dan dokumen PRD.md yang sudah ada di bawah.
-
-Dokumen PRD.md yang sudah digenerate:
-${previousContent}
+      filePrompt = `Buat dokumen ARCHITECTURE.md (System Architecture Document) berdasarkan deskripsi proyek dan dokumen PRD.md sebagai acuan utama di bawah.
 
 Dokumen ini WAJIB berisi:
 - Detail tech stack beserta versi runtime yang digunakan (framework, bahasa, database, cache, ORM, auth, storage, deployment) — HARUS KONSISTEN dengan PRD.md
@@ -144,7 +188,7 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan PRD.md. Jangan guna
 
     default: {
       const labels = {
-        'REQUIREMENTS.md': `Buat dokumen REQUIREMENTS.md (Dependency & Version Management) berdasarkan deskripsi proyek, PRD.md, dan ARCHITECTURE.md yang sudah ada.
+        'REQUIREMENTS.md': `Buat dokumen REQUIREMENTS.md (Dependency & Version Management) berdasarkan deskripsi proyek serta referensi PRD.md dan ARCHITECTURE.md di bawah.
 
 Dokumen ini WAJIB berisi:
 - Semua dependensi production dan development beserta versi spesifiknya yang stabil, dipisahkan berdasarkan layer atau modul aplikasi (core framework, database & ORM, autentikasi, state management, UI components, validasi, utilities, linting, testing)
@@ -152,7 +196,7 @@ Dokumen ini WAJIB berisi:
 - Catatan eksplisit tentang kombinasi versi yang tidak kompatibel untuk mencegah dependency hell
 
 Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan ARCHITECTURE.md.`,
-        'DATA_MODELS.md': `Buat dokumen DATA_MODELS.md (Database Schema & Data Models) berdasarkan proyek dan dokumen sebelumnya.
+        'DATA_MODELS.md': `Buat dokumen DATA_MODELS.md (Database Schema & Data Models) berdasarkan proyek dan referensi dokumen di bawah.
 
 Dokumen ini WAJIB berisi:
 - Skema database lengkap mencakup semua entitas, field, tipe data, primary key, foreign key, indeks, dan constraint per tabel
@@ -265,6 +309,7 @@ Tulis konten LENGKAP yang merangkum SEMUA dokumen 1-11. Jangan tambahkan informa
   return `${BASE_SYSTEM}
 
 ${filePrompt}
+${contextSection}
 
 OUTPUT FORMAT:
 - Mulai dengan "# ${fileName}" sebagai heading level-1
@@ -302,11 +347,11 @@ async function generateDocs(supabase, sessionId, messages, config) {
         if (aiResponse) break;
       } catch (err) {
         const msg = err.message || '';
-        if (msg.includes('quota') || msg.includes('rate') || msg.includes('429')) {
-          throw err;
-        }
+        const isRetryable = msg.includes('quota') || msg.includes('rate') || msg.includes('429');
         if (attempt < 2) {
-          await new Promise(r => setTimeout(r, 5000 * (attempt + 1)));
+          const delay = isRetryable ? 30000 * (attempt + 1) : 5000 * Math.pow(2, attempt);
+          console.log(`Retry ${fileName} attempt ${attempt + 1} after ${delay}ms: ${msg.slice(0, 100)}`);
+          await new Promise(r => setTimeout(r, delay));
         }
       }
     }
@@ -328,7 +373,16 @@ async function generateDocs(supabase, sessionId, messages, config) {
 
     if (hasPlaceholder) {
       const correctionPrompt = `${prompt}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
-      aiResponse = await callAI(correctionPrompt, config);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          aiResponse = await callAI(correctionPrompt, config);
+          break;
+        } catch (err) {
+          if (attempt < 1) {
+            await new Promise(r => setTimeout(r, 5000 * Math.pow(2, attempt)));
+          }
+        }
+      }
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
@@ -355,6 +409,33 @@ async function generateDocs(supabase, sessionId, messages, config) {
 
     if (Object.keys(existingFiles).length > 2) {
       previewLimit = 2000;
+    }
+  }
+
+  // Final consistency check against PRD
+  const consistencyPrompt = buildConsistencyPrompt(existingFiles);
+  if (consistencyPrompt) {
+    try {
+      const consistencyResponse = await callAI(consistencyPrompt, config);
+      if (!consistencyResponse.includes('SEMUA KONSISTEN')) {
+        const sections = consistencyResponse.split(/\n(?=# .+\.md)/);
+        for (const section of sections) {
+          const firstNewline = section.indexOf('\n');
+          if (firstNewline === -1) continue;
+          const header = section.slice(0, firstNewline).trim();
+          const content = section.slice(firstNewline + 1).trim();
+          const match = header.match(/^# (.+\.md)$/);
+          if (match && existingFiles[match[1]] && match[1] !== 'PRD.md') {
+            existingFiles[match[1]] = `# ${match[1]}\n\n${content}`;
+          }
+        }
+        await supabase
+          .from('sessions')
+          .update({ generated_files: existingFiles, updated_at: new Date().toISOString() })
+          .eq('id', sessionId);
+      }
+    } catch {
+      // Consistency check is optional; ignore errors
     }
   }
 
@@ -779,7 +860,7 @@ export default async (req) => {
 
     await supabase
       .from('sessions')
-      .update({ updated_at: new Date().toISOString() })
+      .update({ updated_at: new Date().toISOString(), generation_status: 'generating', generation_error: null })
       .eq('id', sessionId);
 
     if (mode === 'n8n') {
@@ -790,7 +871,7 @@ export default async (req) => {
 
     await supabase
       .from('sessions')
-      .update({ updated_at: new Date().toISOString() })
+      .update({ updated_at: new Date().toISOString(), generation_status: 'completed' })
       .eq('id', sessionId);
 
     return new Response(JSON.stringify({ success: true }), {
@@ -802,7 +883,7 @@ export default async (req) => {
     try {
       await supabase
         .from('sessions')
-        .update({ updated_at: new Date().toISOString() })
+        .update({ updated_at: new Date().toISOString(), generation_status: 'failed', generation_error: errorMsg })
         .eq('id', sessionId);
     } catch {}
 

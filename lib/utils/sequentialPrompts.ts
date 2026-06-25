@@ -32,16 +32,23 @@ function formatConversation(messages: { role: string; content: string }[]): stri
   return messages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
 }
 
-function formatPreviousFiles(
+function formatPRDFull(files: Record<string, string>): string {
+  const prdContent = files['PRD.md'];
+  if (!prdContent) return '';
+  return `--- PRD.md (ACUAN UTAMA — LENGKAP) ---\n${prdContent}`;
+}
+
+function formatOtherFiles(
   files: Record<string, string>,
   previewLimit: number = 0,
 ): string {
   return Object.entries(files)
+    .filter(([name]) => name !== 'PRD.md')
     .map(([name, content]) => {
       const text = previewLimit > 0 && content.length > previewLimit
         ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk menghemat konteks]'
         : content;
-      return `--- ${name} ---\n${text}`;
+      return `--- ${name} (REFERENSI) ---\n${text}`;
     })
     .join('\n\n');
 }
@@ -49,7 +56,7 @@ function formatPreviousFiles(
 const BASE_SYSTEM = `Anda adalah senior software architect dan technical writer. Output Anda harus presisi, terstruktur, dan lengkap. WAJIB GUNAKAN BAHASA INDONESIA.
 
 ATURAN KUALITAS:
-1. KONSISTENSI — semua dokumen dalam satu proyek HARUS konsisten satu sama lain. Jangan kontradiksi dengan dokumen sebelumnya. Jika ada perbedaan, sesuaikan dengan dokumen yang sudah ada.
+1. KONSISTENSI — semua dokumen dalam satu proyek HARUS konsisten satu sama lain. PRD.md adalah ACUAN UTAMA. Jangan kontradiksi dengan PRD.md. Jika ada perbedaan, sesuaikan dengan PRD.md.
 2. DILARANG placeholder — jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 3. LENGKAP — setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
 4. SPESIFIK — gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".`;
@@ -65,6 +72,37 @@ function insufficientContextMessage(): string {
   return 'INSUFFICIENT_CONTEXT: Maaf, percakapan ini belum memiliki detail proyek yang cukup. Silakan lanjutkan diskusi dan tentukan dulu proyek atau program apa yang ingin Anda bangun.';
 }
 
+export function buildConsistencyPrompt(files: Record<string, string>): string {
+  const prdContent = files['PRD.md'];
+  if (!prdContent) return '';
+
+  const otherEntries = Object.entries(files).filter(([name]) => name !== 'PRD.md');
+
+  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI dokumen spesifikasi proyek berikut.
+
+PRD.md adalah ACUAN UTAMA yang HARUS diikuti oleh SEMUA dokumen lainnya.
+
+Tugas Anda:
+1. Baca PRD.md (ACUAN UTAMA)
+2. Baca dokumen lainnya
+3. Periksa apakah ada KONTRADIKSI atau KETIDAKSESUAIAN dengan PRD.md
+4. Jika SEMUA konsisten → balas hanya dengan teks: SEMUA KONSISTEN
+5. Jika ada yang perlu diperbaiki → keluarkan ULANG file yang bermasalah LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md"
+
+--- PRD.md (ACUAN UTAMA - LENGKAP) ---
+${prdContent}
+
+`;
+
+  for (const [name, content] of otherEntries) {
+    prompt += `\n--- ${name} ---\n${content}\n`;
+  }
+
+  prompt += `\n\nSETELAH memeriksa, jika SEMUA KONSISTEN balas "SEMUA KONSISTEN". Jika ada yang kontradiksi, keluarkan ULANG file tersebut LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md".`;
+
+  return prompt;
+}
+
 export function buildFilePrompt(
   fileIndex: number,
   messages: { role: string; content: string }[],
@@ -78,9 +116,15 @@ export function buildFilePrompt(
   }
 
   const conversation = formatConversation(messages);
-  const previousContent = formatPreviousFiles(previousFiles, previewLimit);
-  const prevFileNames = FILE_ORDER.slice(0, fileIndex).join(', ');
-  const nextFileNames = FILE_ORDER.slice(fileIndex + 1).join(', ');
+  const prdSection = formatPRDFull(previousFiles);
+  const otherSection = formatOtherFiles(previousFiles, previewLimit);
+
+  let contextSection = '';
+  if (prdSection || otherSection) {
+    contextSection = '\n\nREFERENSI DOKUMEN SEBELUMNYA:\n\n';
+    if (prdSection) contextSection += prdSection + '\n';
+    if (otherSection) contextSection += '\n' + otherSection;
+  }
 
   let filePrompt = '';
 
@@ -103,10 +147,7 @@ Tulis konten LENGKAP dan SPESIFIK untuk setiap bagian. Jangan gunakan placeholde
       break;
 
     case 'ARCHITECTURE.md':
-      filePrompt = `Buat dokumen ARCHITECTURE.md (System Architecture Document) berdasarkan deskripsi proyek dari percakapan dan dokumen PRD.md yang sudah ada di bawah.
-
-Dokumen PRD.md yang sudah digenerate:
-${previousContent}
+      filePrompt = `Buat dokumen ARCHITECTURE.md (System Architecture Document) berdasarkan deskripsi proyek dan dokumen PRD.md sebagai acuan utama di bawah.
 
 Dokumen ini WAJIB berisi:
 - Detail tech stack beserta versi runtime yang digunakan (framework, bahasa, database, cache, ORM, auth, storage, deployment) — HARUS KONSISTEN dengan PRD.md
@@ -119,10 +160,7 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan PRD.md. Jangan guna
       break;
 
     case 'REQUIREMENTS.md':
-      filePrompt = `Buat dokumen REQUIREMENTS.md (Dependency & Version Management) berdasarkan deskripsi proyek, PRD.md, dan ARCHITECTURE.md yang sudah ada.
-
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
+      filePrompt = `Buat dokumen REQUIREMENTS.md (Dependency & Version Management) berdasarkan deskripsi proyek serta referensi PRD.md dan ARCHITECTURE.md di bawah.
 
 Dokumen ini WAJIB berisi:
 - Semua dependensi production dan development beserta versi spesifiknya yang stabil, dipisahkan berdasarkan layer atau modul aplikasi (core framework, database & ORM, autentikasi, state management, UI components, validasi, utilities, linting, testing)
@@ -133,10 +171,7 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan ARCHITECTURE.md.`;
       break;
 
     case 'DATA_MODELS.md':
-      filePrompt = `Buat dokumen DATA_MODELS.md (Database Schema & Data Models) berdasarkan proyek dan dokumen sebelumnya.
-
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
+      filePrompt = `Buat dokumen DATA_MODELS.md (Database Schema & Data Models) berdasarkan proyek dan referensi dokumen di bawah.
 
 Dokumen ini WAJIB berisi:
 - Skema database lengkap mencakup semua entitas, field, tipe data, primary key, foreign key, indeks, dan constraint per tabel
@@ -150,9 +185,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
 
     case 'ENV_SCHEMA.md':
       filePrompt = `Buat dokumen ENV_SCHEMA.md (Environment Variable Schema) berdasarkan proyek dan dokumen sebelumnya.
-
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
 
 Dokumen ini WAJIB berisi:
 - Daftar lengkap semua environment variable yang dibutuhkan aplikasi, dikelompokkan per kategori (application, database, authentication, OAuth, email, storage, payment, monitoring)
@@ -168,9 +200,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
     case 'CONVENTIONS.md':
       filePrompt = `Buat dokumen CONVENTIONS.md (Code & Project Conventions) berdasarkan proyek dan dokumen sebelumnya.
 
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
-
 Dokumen ini WAJIB berisi:
 - Aturan penamaan (naming conventions) untuk file, folder, variabel, fungsi, class, konstanta, enum, kolom database, dan environment variable menggunakan gaya yang konsisten (PascalCase, camelCase, snake_case, kebab-case, SCREAMING_SNAKE_CASE sesuai konteksnya)
 - Konfigurasi ESLint dan Prettier yang digunakan beserta rules yang diterapkan
@@ -185,9 +214,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
     case 'TEST_STRATEGY.md':
       filePrompt = `Buat dokumen TEST_STRATEGY.md (Testing Strategy Document) berdasarkan proyek dan dokumen sebelumnya.
 
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
-
 Dokumen ini WAJIB berisi:
 - Filosofi dan pendekatan testing yang digunakan (misalnya Testing Trophy)
 - Jenis test yang diterapkan (Unit, Integration, Component, E2E, API) beserta framework dan library yang dipakai untuk masing-masing jenis
@@ -201,9 +227,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
 
     case 'SECURITY.md':
       filePrompt = `Buat dokumen SECURITY.md (Security Document) berdasarkan proyek dan dokumen sebelumnya.
-
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
 
 Dokumen ini WAJIB berisi:
 - Threat model aplikasi (aset yang dilindungi, potensi ancaman, dan tingkat risikonya)
@@ -221,9 +244,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
     case 'DEPLOYMENT.md':
       filePrompt = `Buat dokumen DEPLOYMENT.md (Deployment Guide) berdasarkan proyek dan dokumen sebelumnya.
 
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
-
 Dokumen ini WAJIB berisi:
 - Daftar environment yang ada (development, staging, production) beserta URL, branch Git yang terhubung, dan kebijakan auto-deploy masing-masing
 - Langkah-langkah deploy ke staging dan production secara detail
@@ -238,9 +258,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
     case 'CHANGELOG.md':
       filePrompt = `Buat dokumen CHANGELOG.md (Changelog & ADR) berdasarkan proyek dan dokumen sebelumnya. Ini adalah proyek yang BELUM mulai coding, jadi versi saat ini adalah v0.1.0 (initial draft).
 
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
-
 Dokumen ini WAJIB berisi:
 - Catatan perubahan per versi menggunakan format standar (Added, Changed, Fixed, Removed, Security) — versi 0.1.0 mencatat inisialisasi proyek
 - Architecture Decision Records (ADR) yang mencatat keputusan teknis atau arsitektur penting beserta alasan di baliknya dan tanggal pengambilan keputusan
@@ -250,9 +267,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan dokumen sebelumnya.
 
     case 'VIBECODING_STEPS.md':
       filePrompt = `Buat dokumen VIBECODING_STEPS.md (Master Build Checklist) berdasarkan proyek dan SEMUA dokumen sebelumnya.
-
-Dokumen sebelumnya yang sudah digenerate:
-${previousContent}
 
 Dokumen ini WAJIB berisi:
 - Master checklist pembangunan aplikasi yang dipecah secara linear menjadi fase-fase besar (Setup, Autentikasi, Fitur Utama 1, Fitur Utama 2, Testing, Deployment)
@@ -266,9 +280,6 @@ Tulis konten LENGKAP dan SPESIFIK. Pastikan KONSISTEN dengan SEMUA dokumen sebel
 
     case 'AGENT_CONTEXT.md':
       filePrompt = `Buat dokumen AGENT_CONTEXT.md (Root AI Context File) — dokumen PALING AKHIR yang merangkum SEMUA dokumen 1-11.
-
-SEMUA dokumen sebelumnya yang sudah digenerate:
-${previousContent}
 
 Dokumen ini adalah ROOT CONTEXT yang dirancang khusus agar AI dapat langsung memahami seluruh konteks proyek di awal sesi baru tanpa perlu penjelasan ulang.
 
@@ -298,6 +309,7 @@ Tulis konten LENGKAP yang merangkum SEMUA dokumen 1-11. Jangan tambahkan informa
   return `${BASE_SYSTEM}
 
 ${filePrompt}
+${contextSection}
 
 OUTPUT FORMAT:
 - Mulai dengan "# ${fileName}" sebagai heading level-1

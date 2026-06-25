@@ -3,6 +3,7 @@ import { createClient } from '@/lib/db/supabaseServerClient';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
+import { FILE_ORDER } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { processSequential, processN8nSync } from '@/lib/utils/generate';
 
@@ -19,16 +20,16 @@ export async function POST(req: Request) {
 
   const { sessionId, mode } = await req.json();
 
-  if (!sessionId || !mode) {
+  if (!sessionId) {
     return NextResponse.json(
-      { success: false, error: { code: 'VALIDATION_ERROR', message: 'sessionId and mode are required' } },
+      { success: false, error: { code: 'VALIDATION_ERROR', message: 'sessionId is required' } },
       { status: 400 },
     );
   }
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('user_id')
+    .select('user_id, generation_status')
     .eq('id', sessionId)
     .single();
 
@@ -44,6 +45,24 @@ export async function POST(req: Request) {
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
     );
+  }
+
+  if (session.generation_status === 'completed') {
+    const filesCount = await supabase
+      .from('sessions')
+      .select('generated_files')
+      .eq('id', sessionId)
+      .single();
+
+    const files = (filesCount.data?.generated_files as Record<string, string>) || {};
+    const existingCount = Object.keys(files).length;
+
+    if (existingCount >= FILE_ORDER.length) {
+      return NextResponse.json(
+        { success: false, error: { code: 'ALREADY_COMPLETED', message: 'Semua dokumen sudah selesai dibuat. Tidak perlu resume.' } },
+        { status: 400 },
+      );
+    }
   }
 
   const { data: providerConfig } = await supabase
@@ -90,30 +109,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Try background function first (production), fallback to sync (local dev)
-  const siteUrl = process.env.DEPLOY_URL || process.env.URL || `https://${req.headers.get('host') || 'localhost:8888'}`;
-  const fnUrl = `${siteUrl}/.netlify/functions/generate-background`;
-
-  const isDev = process.env.NODE_ENV === 'development' || (!process.env.DEPLOY_URL && !process.env.URL);
-
-  if (!isDev) {
-    try {
-      const fnRes = await fetch(fnUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, mode }),
-        signal: AbortSignal.timeout(5000),
-      });
-
-      if (fnRes.ok) {
-        return NextResponse.json({ success: true, data: { jobId: sessionId, mode } });
-      }
-    } catch {
-      // Background function unavailable, fall through to sync
-    }
-  }
-
-  // Synchronous fallback (auto-used in dev, fallback in production)
   const supabaseAdmin = createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -131,7 +126,7 @@ export async function POST(req: Request) {
 
     await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId);
 
-    return NextResponse.json({ success: true, data: { jobId: sessionId, mode } });
+    return NextResponse.json({ success: true, data: { jobId: sessionId, mode, resumed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
     await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId);
