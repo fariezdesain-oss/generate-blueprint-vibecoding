@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import { ensureProfile } from '@/lib/db/ensureProfile';
-import { encrypt, decrypt } from '@/lib/utils/encryption';
+import { decrypt, encrypt } from '@/lib/utils/encryption';
+import { maskApiKey, serializeProviderConfig } from '@/lib/utils/providerConfig';
 
 export async function GET() {
   const supabase = await createClient();
@@ -27,16 +28,7 @@ export async function GET() {
     );
   }
 
-  const providers = data.map((p) => ({
-    id: p.id,
-    provider_name: p.provider_name,
-    model_name: p.model_name,
-    api_key: decrypt(p.api_key),
-    base_url: p.base_url || '',
-    is_active: p.is_active,
-    created_at: p.created_at,
-    updated_at: p.updated_at,
-  }));
+  const providers = data.map((p) => serializeProviderConfig(p, maskApiKey(decrypt(p.api_key))));
 
   return NextResponse.json({ success: true, data: { providers } });
 }
@@ -89,7 +81,7 @@ export async function POST(req: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', existing.id)
-      .select('id, provider_name, model_name, is_active, created_at, updated_at')
+      .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
       .single();
 
     if (error) {
@@ -99,7 +91,7 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ success: true, data: { provider: data } });
+    return NextResponse.json({ success: true, data: { provider: serializeProviderConfig(data, maskApiKey(api_key)) } });
   }
 
   const { data, error } = await supabase
@@ -111,7 +103,7 @@ export async function POST(req: Request) {
       base_url: base_url || null,
       model_name,
     })
-    .select('id, provider_name, model_name, is_active, created_at, updated_at')
+    .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
     .single();
 
   if (error) {
@@ -121,7 +113,7 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json({ success: true, data: { provider: data } }, { status: 201 });
+  return NextResponse.json({ success: true, data: { provider: serializeProviderConfig(data, maskApiKey(api_key)) } }, { status: 201 });
 }
 
 export async function PUT(req: Request) {
@@ -164,7 +156,7 @@ export async function PUT(req: Request) {
     .eq('user_id', userData.user.id)
     .eq('provider_name', provider_name)
     .eq('model_name', model_name)
-    .select('id, provider_name, model_name, is_active, created_at, updated_at')
+    .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
     .single();
 
   if (error) {
@@ -174,5 +166,5 @@ export async function PUT(req: Request) {
     );
   }
 
-  return NextResponse.json({ success: true, data: { provider: data } });
+  return NextResponse.json({ success: true, data: { provider: serializeProviderConfig(data, maskApiKey(decrypt(data.api_key))) } });
 }

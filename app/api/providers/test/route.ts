@@ -5,7 +5,29 @@ import { decrypt } from '@/lib/utils/encryption';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 
+const TEST_TIMEOUT_MS = 18000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('AI_TEST_TIMEOUT')), timeoutMs);
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timeout));
+  });
+}
+
 export async function POST(req: Request) {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+
+  if (!userData.user) {
+    return NextResponse.json(
+      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
+      { status: 401 },
+    );
+  }
+
   const body = await req.json();
   const { provider_name, api_key, model_name, base_url, provider_id } = body;
 
@@ -16,22 +38,14 @@ export async function POST(req: Request) {
 
   // Test saved provider by ID
   if (provider_id) {
-    const supabase = await createClient();
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
-      return NextResponse.json(
-        { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-        { status: 401 },
-      );
-    }
-
     const { data: config } = await supabase
       .from('provider_configs')
       .select('*')
       .eq('id', provider_id)
+      .eq('user_id', userData.user.id)
       .single();
 
-    if (!config || config.user_id !== userData.user.id) {
+    if (!config) {
       return NextResponse.json(
         { success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider not found' } },
         { status: 404 },
@@ -56,18 +70,32 @@ export async function POST(req: Request) {
     apiKey: resolvedKey,
     modelName: resolvedModel,
     baseUrl: resolvedBaseUrl,
+    maxTokens: 16,
   };
 
   try {
     const provider = createProvider(aiConfig.providerName);
     const testPrompt = 'Balas dengan satu kata: "OK"';
-    await provider.generateChat(testPrompt, aiConfig);
+    await withTimeout(provider.generateChat(testPrompt, aiConfig), TEST_TIMEOUT_MS);
 
     return NextResponse.json({
       success: true,
       data: { message: `Berhasil terhubung ke ${resolvedName} / ${resolvedModel}` },
     });
   } catch (err) {
+    if (err instanceof Error && err.message === 'AI_TEST_TIMEOUT') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'AI_TEST_TIMEOUT',
+            message: 'Test koneksi melebihi batas waktu. Periksa API key/model atau coba provider lain.',
+          },
+        },
+        { status: 504 },
+      );
+    }
+
     const { code, message } = formatAIError(err);
     return NextResponse.json(
       { success: false, error: { code, message } },

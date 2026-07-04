@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { FILE_ORDER, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 
 export async function GET(
   _req: Request,
@@ -40,17 +41,44 @@ export async function GET(
   const hasN8n = !!n8nWorkflow && typeof n8nWorkflow === 'object' && Object.keys(n8nWorkflow).length > 0;
   const hasDocs = !!session.generated_files && typeof session.generated_files === 'object';
 
+  let genProgressMeta: Record<string, unknown> | null = null;
+  let cleanFiles: Record<string, unknown> | null = null;
+
+  if (hasDocs) {
+    const raw = session.generated_files as Record<string, unknown>;
+    const { _progress, ...rest } = raw;
+    cleanFiles = rest;
+    genProgressMeta = (_progress as Record<string, unknown>) || null;
+  }
+
   if (!hasDocs && !hasN8n) {
     return NextResponse.json({
       success: true,
-      data: { files: null, generated_at: null },
+      data: {
+        files: null,
+        generated_at: null,
+        generation_status: session.generation_status || null,
+        generation_error: session.generation_error || null,
+        generation_progress: genProgressMeta,
+        progress: { current: 0, total: FILE_ORDER.length, next_file: FILE_ORDER[0] },
+      },
     });
   }
 
   const result: Record<string, unknown> = {};
   if (hasDocs) {
-    result.files = session.generated_files;
+    const fileCount = countGeneratedSpecFiles(cleanFiles as Record<string, string>);
+    const docsStatus = fileCount >= FILE_ORDER.length ? 'completed' : null;
+    result.files = cleanFiles;
     result.generated_at = session.generated_at;
+    result.generation_status = session.generation_status || docsStatus || null;
+    result.generation_error = session.generation_error || null;
+    result.generation_progress = genProgressMeta;
+    result.progress = {
+      current: fileCount,
+      total: FILE_ORDER.length,
+      next_file: getNextMissingSpecFile(cleanFiles as Record<string, string>),
+    };
   }
   if (hasN8n) {
     result.n8n_workflow = n8nWorkflow;

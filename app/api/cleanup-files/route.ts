@@ -1,16 +1,21 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
 const EXPIRY_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
 
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
   const cutoff = new Date(Date.now() - EXPIRY_MS).toISOString();
 
   const { data: messages, error: msgError } = await supabase
@@ -29,6 +34,8 @@ export async function GET(req: Request) {
     if (!msg.attachments || !Array.isArray(msg.attachments)) continue;
 
     for (const att of msg.attachments) {
+      if (!att || typeof att.storagePath !== 'string') continue;
+
       const { error } = await supabase.storage
         .from('chat-attachments')
         .remove([att.storagePath]);

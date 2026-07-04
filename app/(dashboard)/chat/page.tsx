@@ -6,7 +6,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { ChatWindow } from '@/components/ui/ChatWindow';
 import { GeminiLoader } from '@/components/ui/GeminiLoader';
 import { Send, FileText, Square } from 'lucide-react';
-import { FILE_ORDER, FILE_LABELS } from '@/lib/utils/sequentialPrompts';
+import { FILE_ORDER, FILE_LABELS, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 import { FilePicker } from '@/components/ui/FilePicker';
 import type { Attachment } from '@/types/chat';
 
@@ -14,7 +14,15 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [genProgress, setGenProgress] = useState({ current: 0, total: FILE_ORDER.length, fileName: '' });
+  const [genProgress, setGenProgress] = useState({
+    current: 0,
+    total: FILE_ORDER.length,
+    fileName: '',
+    fileProgress: 0,
+    overallProgress: 0,
+    stage: '',
+    stageMessage: '',
+  });
   const [pendingFiles, setPendingFiles] = useState<Attachment[]>([]);
   const [filePickerKey, setFilePickerKey] = useState(0);
   const [showModePicker, setShowModePicker] = useState(false);
@@ -51,7 +59,8 @@ export default function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const generateCooldownRef = useRef(false);
   const regenerateRequestedRef = useRef(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingActiveRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -388,7 +397,8 @@ export default function ChatPage() {
   const pollStartRef = useRef(0);
 
   function stopPolling() {
-    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingActiveRef.current = false;
+    if (pollingRef.current) clearTimeout(pollingRef.current);
     pollingRef.current = null;
     setGenerating(false);
     generateCooldownRef.current = true;
@@ -396,10 +406,13 @@ export default function ChatPage() {
   }
 
   const pollForResults = (mode: string) => {
-    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (pollingRef.current) clearTimeout(pollingRef.current);
+    pollingActiveRef.current = true;
     pollStartRef.current = Date.now();
 
-    pollingRef.current = setInterval(async () => {
+    const poll = async () => {
+      if (!pollingActiveRef.current) return;
+
       if (Date.now() - pollStartRef.current > 900000) {
         stopPolling();
         setChatError('Generate melebihi batas waktu 15 menit. Silakan coba lagi.');
@@ -418,21 +431,55 @@ export default function ChatPage() {
           }
         } else {
           const files = json.data.files;
-          if (files) {
-            const count = Object.keys(files).length;
-            const fileName = count < FILE_ORDER.length ? FILE_ORDER[count] : '';
-            setGenProgress({ current: Math.min(count, FILE_ORDER.length), total: FILE_ORDER.length, fileName });
+          const genProgressMeta = json.data.generation_progress;
+          if (genProgressMeta) {
+            const { currentFileIndex, currentFileName, currentFileProgress, overallProgress, stage, message } = genProgressMeta;
+            const count = currentFileIndex + (currentFileProgress >= 100 ? 1 : 0);
+            setGenProgress((prev) => ({
+              current: Math.max(prev.current, Math.min(count, FILE_ORDER.length)),
+              total: FILE_ORDER.length,
+              fileName: currentFileName || '',
+              fileProgress: currentFileProgress || 0,
+              overallProgress: overallProgress || 0,
+              stage: stage || '',
+              stageMessage: message || '',
+            }));
+          } else if (files) {
+            const count = json.data.progress?.current ?? countGeneratedSpecFiles(files);
+            const nextFile = json.data.progress?.next_file ?? getNextMissingSpecFile(files);
+            const status = json.data.generation_status;
+            const fileName = count >= FILE_ORDER.length && status === 'generating'
+              ? 'Final consistency check'
+              : nextFile;
+            setGenProgress((prev) => ({
+              current: Math.max(prev.current, Math.min(count, FILE_ORDER.length)),
+              total: FILE_ORDER.length,
+              fileName,
+              fileProgress: count >= FILE_ORDER.length ? 100 : 0,
+              overallProgress: Math.round((count / FILE_ORDER.length) * 100),
+              stage: count >= FILE_ORDER.length ? 'done' : '',
+              stageMessage: '',
+            }));
+          }
 
-            if (count >= FILE_ORDER.length) {
-              stopPolling();
-              router.push(`/generate/results?session_id=${sessionId}`);
-            }
+          if (json.data.generation_status === 'completed' || genProgressMeta?.stage === 'done') {
+            stopPolling();
+            router.push(`/generate/results?session_id=${sessionId}`);
+          }
+          if (json.data.generation_status === 'failed') {
+            stopPolling();
+            setChatError(json.data.generation_error || 'Generate gagal. Silakan coba lagi.');
           }
         }
       } catch {
         // polling error, will retry on next interval
       }
-    }, 2000);
+      if (pollingActiveRef.current) {
+        pollingRef.current = setTimeout(poll, 2000);
+      }
+    };
+
+    poll();
   };
 
   const handleGenerate = async () => {
@@ -455,7 +502,7 @@ export default function ChatPage() {
           hasN8nExisting = true;
         }
         if (mode !== 'n8n' && filesJson.data.files) {
-          existingCount = Object.keys(filesJson.data.files).length;
+          existingCount = countGeneratedSpecFiles(filesJson.data.files);
         }
       }
     }
@@ -472,7 +519,7 @@ export default function ChatPage() {
 
     setGenerating(true);
     setChatError(null);
-    setGenProgress({ current: existingCount, total: FILE_ORDER.length, fileName: '' });
+    setGenProgress({ current: existingCount, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: Math.round((existingCount / FILE_ORDER.length) * 100), stage: '', stageMessage: '' });
 
     // Mulai polling dulu sebelum POST agar progress bar real-time
     pollForResults(mode);
@@ -540,12 +587,12 @@ export default function ChatPage() {
               <div>
                 <h2 className="text-sm sm:text-base lg:text-lg font-bold text-primary">Dokumen Instruksi Vibecoding</h2>
                 <p className="mt-2 text-xs font-semibold text-tertiary leading-relaxed">
-                  Generate 12 dokumen engineering standar (PRD, Architecture, Requirements, dll.)
+                  Generate 7 dokumen engineering standar (PRD, Architecture, Data, Standards, dll.)
                   berdasarkan diskusi proyek dengan AI.
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-1.5">
-                {['PRD', 'Arch', 'Req', 'Data', 'Deploy'].map((tag) => (
+                {['PRD', 'Arch', 'Data', 'Standard', 'Delivery'].map((tag) => (
                   <span key={tag} className="rounded-lg bg-tertiary px-2.5 py-1 text-[10px] font-bold text-tertiary">
                     {tag}
                   </span>
@@ -622,19 +669,33 @@ export default function ChatPage() {
                 </svg>
               </div>
               <div className="flex flex-col items-center gap-2">
-                <p className="text-sm font-bold text-primary">Membuat dokumen...</p>
-                <p className="text-xs text-secondary">{genProgress.fileName ? FILE_LABELS[genProgress.fileName] : 'Mempersiapkan dokumen...'}</p>
+                <p className="text-sm font-bold text-primary">{genProgress.stageMessage || 'Membuat dokumen...'}</p>
+                <p className="text-xs text-secondary">{genProgress.fileName ? FILE_LABELS[genProgress.fileName] || genProgress.fileName : 'Mempersiapkan dokumen...'}</p>
               </div>
-              <div className="w-full">
-                <div className="mb-2 flex items-center justify-between text-xs text-secondary">
-                  <span>Progress</span>
-                  <span>{genProgress.current} / {genProgress.total}</span>
+              <div className="w-full space-y-3">
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs text-secondary">
+                    <span>Progress Dokumen Saat Ini</span>
+                    <span>{genProgress.fileProgress}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-tertiary">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-gemini-blue to-gemini-pink transition-all duration-500"
+                      style={{ width: `${genProgress.fileProgress}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-tertiary">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-gemini-blue via-gemini-blue to-gemini-pink transition-all duration-500"
-                    style={{ width: `${(genProgress.current / genProgress.total) * 100}%` }}
-                  />
+                <div>
+                  <div className="mb-1 flex items-center justify-between text-xs text-secondary">
+                    <span>Progress Keseluruhan</span>
+                    <span>{genProgress.overallProgress}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-tertiary">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-gemini-blue via-gemini-blue to-gemini-pink transition-all duration-500"
+                      style={{ width: `${genProgress.overallProgress}%` }}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="flex flex-wrap justify-center gap-1.5">
@@ -728,7 +789,7 @@ export default function ChatPage() {
                   }`}
                   title={
                     canGenerate
-                      ? mode === 'n8n' ? 'Generate n8n Workflow' : 'Generate 12 Engineering Documents'
+                      ? mode === 'n8n' ? 'Generate n8n Workflow' : 'Generate 7 Engineering Documents'
                       : 'Selesaikan dulu sesi diskusi proyek Anda'
                   }
                 >

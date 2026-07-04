@@ -48,6 +48,26 @@ export async function POST(req: Request) {
     );
   }
 
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('user_id')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' } },
+      { status: 404 },
+    );
+  }
+
+  if (session.user_id !== userData.user.id) {
+    return NextResponse.json(
+      { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
+      { status: 403 },
+    );
+  }
+
   const fileName = `${crypto.randomUUID()}-${encodeURIComponent(file.name)}`;
   const storagePath = `${userData.user.id}/${sessionId}/${fileName}`;
 

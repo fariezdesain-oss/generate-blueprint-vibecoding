@@ -4,6 +4,7 @@ import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig, ContentFile } from '@/lib/ai/provider.interface';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
+import { sanitizeChatAttachments, type ChatAttachment } from '@/lib/utils/attachments';
 
 async function getActiveProviderConfig(userId: string): Promise<{
   providerName: string;
@@ -36,7 +37,7 @@ WAJIB GUNAKAN BAHASA INDONESIA. Selalu jawab dalam Bahasa Indonesia.
 
 CRITICAL — GENERATE BUTTON ACTIVATION:
 Tombol "Generate Documentation" diaktifkan oleh frontend HANYA jika respons Anda mengandung kalimat:
-"Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 12 dokumen spesifikasi."
+"Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 7 dokumen spesifikasi."
 Jika kalimat itu tidak ada, tombol tetap NONAKTIF. Jadi pastikan Anda hanya mengucapkannya saat benar-benar siap.
 
 BEHAVIOR RULES:
@@ -57,8 +58,8 @@ BEHAVIOR RULES:
 
 4. **Keep digging** — Jika jawaban user masih vague atau kurang jelas, jangan sungkan untuk tanya lebih detail. Boleh lanjut bertanya di respons berikutnya jika masih ada yang belum tergali. Jangan berhenti sampai Anda punya gambaran jelas.
 
-5. **Signal readiness (generate gate)** — Hanya ketika Anda merasa sudah memiliki konteks CUKUP untuk menulis 12 dokumen spesifikasi (problem statement, target user, platform, fitur inti sudah jelas), KIRIMKAN sinyal generate dengan mengakhiri respons menggunakan kalimat PERSIS:
-"Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 12 dokumen spesifikasi."
+5. **Signal readiness (generate gate)** — Hanya ketika Anda merasa sudah memiliki konteks CUKUP untuk menulis 7 dokumen spesifikasi (problem statement, target user, platform, fitur inti sudah jelas), KIRIMKAN sinyal generate dengan mengakhiri respons menggunakan kalimat PERSIS:
+"Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 7 dokumen spesifikasi."
 Jangan pernah mengirim sinyal ini jika informasi masih kurang.
 
 6. **User requests generate early** — Jika user meminta generate (misal: "generate sekarang", "buat dokumentasinya", "ayo generate"), EVALUASI apakah informasi proyek sudah cukup mengikuti kriteria di rule #5. Jika sudah cukup, kirim sinyal generate. Jika belum, jelaskan data apa yang masih diperlukan dan JANGAN kirim sinyal.
@@ -69,7 +70,7 @@ Jangan pernah mengirim sinyal ini jika informasi masih kurang.
 
 9. **Regenerate from scratch** — Jika user meminta membuat ulang hasil generate (misal: "buat ulang", "generate ulang", "hasilnya kurang", "reset", "dari awal"), EVALUASI apakah informasi proyek sudah cukup (sama seperti rule #5). Jika sudah, kirim KEDUA sinyal berikut secara berurutan dalam respons:
    "Saya akan generate ulang dari awal."
-   "Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 12 dokumen spesifikasi."
+   "Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan 7 dokumen spesifikasi."
    Jika informasi belum cukup, jelaskan apa yang kurang dan JANGAN kirim kedua sinyal tersebut.
    Jika user hanya menyebut "lanjutkan" atau "generate" tanpa "ulang"/"reset"/"dari awal", jangan kirim sinyal regenerate.
 
@@ -256,11 +257,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const userAttachments = files && Array.isArray(files)
-    ? files.map((f: { id: string; name: string; mimeType: string; size: number; storagePath: string }) => ({
-        id: f.id, name: f.name, mimeType: f.mimeType, size: f.size, storagePath: f.storagePath,
-      }))
-    : [];
+  let userAttachments: ChatAttachment[];
+  try {
+    userAttachments = sanitizeChatAttachments(files, userData.user.id, session_id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Invalid attachment metadata';
+    return NextResponse.json(
+      { success: false, error: { code: 'VALIDATION_ERROR', message } },
+      { status: 400 },
+    );
+  }
 
   const { error: userMsgError } = await supabase
     .from('messages')
@@ -268,7 +274,7 @@ export async function POST(req: Request) {
       session_id,
       role: 'user',
       content: content || '',
-      attachments: userAttachments.length > 0 ? JSON.stringify(userAttachments) : '[]',
+      attachments: userAttachments,
     });
 
   if (userMsgError) {

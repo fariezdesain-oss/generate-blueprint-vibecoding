@@ -28,7 +28,7 @@ export async function POST(req: Request) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('user_id')
+    .select('*')
     .eq('id', sessionId)
     .single();
 
@@ -44,6 +44,10 @@ export async function POST(req: Request) {
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
     );
+  }
+
+  if (session.generation_status === 'generating') {
+    return NextResponse.json({ success: true, data: { jobId: sessionId, mode, alreadyRunning: true } });
   }
 
   const { data: providerConfig } = await supabase
@@ -90,6 +94,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+
+  try {
+    await supabaseAdmin
+      .from('sessions')
+      .update({ generation_status: 'generating', generation_error: null, updated_at: new Date().toISOString() })
+      .eq('id', sessionId)
+      .eq('user_id', userData.user.id);
+  } catch {
+    // Kolom generation_status/generation_error mungkin belum ada — aman diabaikan
+  }
+
   // Try background function first (production), fallback to sync (local dev)
   const siteUrl = process.env.DEPLOY_URL || process.env.URL || `https://${req.headers.get('host') || 'localhost:8888'}`;
   const fnUrl = `${siteUrl}/.netlify/functions/generate-background`;
@@ -108,20 +128,15 @@ export async function POST(req: Request) {
       if (fnRes.ok) {
         return NextResponse.json({ success: true, data: { jobId: sessionId, mode } });
       }
-    } catch {
-      // Background function unavailable, fall through to sync
+    } catch (err) {
+      if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+        return NextResponse.json({ success: true, data: { jobId: sessionId, mode, backgroundPending: true } });
+      }
+      // Background function unavailable before accepting the job, fall through to sync
     }
   }
 
   // Synchronous fallback (auto-used in dev, fallback in production)
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
-  await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId);
-
   try {
     if (mode === 'n8n') {
       await processN8nSync(supabaseAdmin, sessionId, messages, aiConfig);
@@ -129,12 +144,12 @@ export async function POST(req: Request) {
       await processSequential(supabaseAdmin, sessionId, messages, aiConfig);
     }
 
-    await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId);
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId);
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },

@@ -4,7 +4,7 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
-import { buildFilePrompt, FILE_ORDER } from '@/lib/utils/sequentialPrompts';
+import { buildFilePrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 
 async function retryAI(
@@ -162,7 +162,7 @@ export async function POST(req: Request) {
       generated_files: updatedFiles,
       updated_at: new Date().toISOString(),
     };
-    if (file_index === FILE_ORDER.length - 1) {
+    if (hasAllSpecFiles(updatedFiles)) {
       updateData.generated_at = new Date().toISOString();
     }
 

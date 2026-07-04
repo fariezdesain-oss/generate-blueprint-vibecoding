@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Vibecoding Docs Generator
 
-## Getting Started
+Aplikasi web untuk membantu user menggali kebutuhan proyek melalui chat AI, lalu menghasilkan dokumen spesifikasi atau workflow n8n dari hasil percakapan. Aplikasi memakai Next.js App Router, Supabase Auth/PostgreSQL/Storage, dan abstraksi multi AI provider.
 
-First, run the development server:
+## Fitur Utama
+
+- Chat requirement discovery dalam Bahasa Indonesia.
+- Mode generate dokumentasi spesifikasi proyek.
+- Mode generate n8n workflow dan setup instructions.
+- Multi-provider AI: Gemini, OpenRouter, Groq, DeepSeek, dan OpenAI-compatible custom endpoint.
+- Session history, generated files, download ZIP, dan attachment upload.
+- API key provider disimpan terenkripsi di database dan hanya dipakai server-side.
+
+## Tech Stack
+
+- Next.js 14 App Router
+- React 18
+- TypeScript 5
+- TailwindCSS
+- Supabase Auth, PostgreSQL, Storage
+- Zustand
+- Jest dan Playwright
+- Netlify Functions untuk background generate
+
+## Persiapan Lokal
+
+Install dependency:
+
+```bash
+npm install
+```
+
+Buat file `.env.local` dan isi variabel berikut:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+ENCRYPTION_SECRET=
+CRON_SECRET=
+```
+
+Catatan:
+
+- `ENCRYPTION_SECRET` wajib kuat dan stabil karena dipakai untuk encrypt/decrypt API key provider.
+- `SUPABASE_SERVICE_ROLE_KEY` hanya boleh tersedia di server/runtime deployment, jangan expose ke client.
+- Detail environment yang dihasilkan generator akan masuk ke `04_PROJECT_STANDARDS.md`.
+
+## Setup Supabase
+
+1. Buat project Supabase.
+2. Jalankan semua migration di folder `supabase/migrations` secara berurutan.
+3. Pastikan bucket `chat-attachments` dibuat oleh migration dan policy storage sudah aktif.
+4. Aktifkan email/password auth di Supabase Auth.
+
+Migration penting:
+
+- `001_initial_schema.sql`: tabel profile, session, message, provider config, dan RLS dasar.
+- `005_add_message_attachments.sql`: kolom attachment dan bucket storage.
+- `012_restrict_chat_attachment_storage.sql`: policy storage agar file hanya bisa diakses pemilik session.
+
+## Menjalankan Aplikasi
+
+Development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Build production:
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+## Testing
 
-To learn more about Next.js, take a look at the following resources:
+Unit test:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm test
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+Coverage:
 
-## Deploy on Vercel
+```bash
+npm run test:coverage
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+End-to-end test:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+```bash
+npm run test:e2e
+```
+
+## Keamanan
+
+- API key AI provider dienkripsi sebelum disimpan ke database.
+- Endpoint provider tidak mengirim API key mentah atau decrypted key ke frontend.
+- Upload attachment memvalidasi session milik user login.
+- Metadata attachment chat divalidasi agar `storagePath` harus berada di `{user_id}/{session_id}/...`.
+- Supabase Storage policy membatasi akses object berdasarkan user dan session owner.
+- Endpoint cleanup memakai `CRON_SECRET` dan service role client server-side.
+
+## Deployment Netlify
+
+1. Set semua environment variable di Netlify.
+2. Pastikan `SUPABASE_SERVICE_ROLE_KEY`, `ENCRYPTION_SECRET`, dan `CRON_SECRET` tidak diawali `NEXT_PUBLIC_`.
+3. Deploy aplikasi dengan konfigurasi `netlify.toml`.
+4. Netlify Function `netlify/functions/generate-background.mjs` dipakai untuk background generate saat production.
+
+## Dokumentasi Tambahan
+
+Generator dokumentasi proyek menghasilkan 7 file bernomor:
+
+- `01_PRD.md`
+- `02_ARCHITECTURE.md`
+- `03_DATA_MODELS.md`
+- `04_PROJECT_STANDARDS.md`
+- `05_DESIGN_SYSTEM.md`
+- `06_DELIVERY.md`
+- `07_AGENT_CONTEXT.md`
+
+Dokumentasi internal aplikasi ini tetap tersedia di folder `docs/`.

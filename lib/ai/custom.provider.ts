@@ -51,23 +51,31 @@ export class OpenAICompatibleProvider implements AIProvider {
 
     const maxTokens = config.maxTokens ?? 32000;
 
-    const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: this.buildHeaders(config),
-      body: JSON.stringify({
-        model: config.modelName,
-        messages: [{ role: 'user', content }],
-        max_tokens: maxTokens,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120000);
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`API error (${res.status}): ${err}`);
+    try {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: this.buildHeaders(config),
+        body: JSON.stringify({
+          model: config.modelName,
+          messages: [{ role: 'user', content }],
+          max_tokens: maxTokens,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(`API error (${res.status}): ${err}`);
+      }
+
+      const json = await res.json();
+      return json.choices?.[0]?.message?.content || '';
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const json = await res.json();
-    return json.choices?.[0]?.message?.content || '';
   }
 
   async *streamChat(

@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pencil, Play, Power, Trash2 } from 'lucide-react';
 
 interface ProviderItem {
   id: string;
   provider_name: string;
   model_name: string;
-  api_key?: string;
+  has_api_key?: boolean;
+  masked_api_key?: string;
   base_url?: string;
   is_active: boolean;
 }
@@ -21,6 +22,7 @@ const PROVIDER_OPTIONS = [
 ];
 
 const EMPTY_FORM = { provider_name: 'gemini', api_key: '', model_name: '', base_url: '' };
+const CLIENT_TEST_TIMEOUT_MS = 22000;
 
 export function ProviderSelector() {
   const [providers, setProviders] = useState<ProviderItem[]>([]);
@@ -30,10 +32,12 @@ export function ProviderSelector() {
   const [testing, setTesting] = useState(false);
   const [testingProviderId, setTestingProviderId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const [editingMaskedKey, setEditingMaskedKey] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const fetchingRef = { current: false };
-  const fetchProviders = async () => {
+  const fetchingRef = useRef(false);
+  const fetchProviders = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
@@ -46,11 +50,11 @@ export function ProviderSelector() {
       setPageLoading(false);
       fetchingRef.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchProviders();
-  }, []);
+  }, [fetchProviders]);
 
   useEffect(() => {
     if (notification) {
@@ -61,12 +65,15 @@ export function ProviderSelector() {
 
   const testConnection = async (providerId?: string): Promise<boolean> => {
     setTesting(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), CLIENT_TEST_TIMEOUT_MS);
     try {
       const body = providerId ? { provider_id: providerId } : form;
       const res = await fetch('/api/providers/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        signal: controller.signal,
       });
       const json = await res.json();
       if (json.success) {
@@ -76,10 +83,14 @@ export function ProviderSelector() {
         setNotification({ type: 'error', message: json.error?.message || 'Gagal terhubung' });
         return false;
       }
-    } catch {
-      setNotification({ type: 'error', message: 'Gagal menghubungi server' });
+    } catch (err) {
+      const message = err instanceof DOMException && err.name === 'AbortError'
+        ? 'Test koneksi melebihi batas waktu. Periksa API key/model atau coba provider lain.'
+        : 'Gagal menghubungi server';
+      setNotification({ type: 'error', message });
       return false;
     } finally {
+      clearTimeout(timeout);
       setTesting(false);
     }
   };
@@ -98,10 +109,16 @@ export function ProviderSelector() {
     setSaving(true);
     setNotification(null);
 
-    const res = await fetch('/api/providers', {
-      method: 'POST',
+    const endpoint = editingProviderId ? `/api/providers/${editingProviderId}` : '/api/providers';
+    const method = editingProviderId ? 'PUT' : 'POST';
+    const payload = editingProviderId && !form.api_key.trim()
+      ? { model_name: form.model_name, base_url: form.base_url }
+      : form;
+
+    const res = await fetch(endpoint, {
+      method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
 
     const json = await res.json();
@@ -117,14 +134,18 @@ export function ProviderSelector() {
     if (savedProvider?.id) {
       const ok = await testConnection(savedProvider.id);
       if (ok) {
-        await fetch(`/api/providers/${savedProvider.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_active: true }),
-        });
+        if (!editingProviderId) {
+          await fetch(`/api/providers/${savedProvider.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: true }),
+          });
+        }
         await fetchProviders();
         notifyProviderChanged();
         setForm({ ...EMPTY_FORM });
+        setEditingProviderId(null);
+        setEditingMaskedKey('');
       }
     }
 
@@ -135,9 +156,21 @@ export function ProviderSelector() {
     setForm({
       provider_name: p.provider_name,
       model_name: p.model_name,
-      api_key: p.api_key || '',
+      api_key: '',
       base_url: p.base_url || '',
     });
+    setEditingProviderId(p.id);
+    setEditingMaskedKey(p.masked_api_key || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingProviderId(null);
+    setEditingMaskedKey('');
+    setForm({ ...EMPTY_FORM });
+  };
+
+  const preventSecretCopy = (e: React.SyntheticEvent) => {
+    e.preventDefault();
   };
 
   const notifyProviderChanged = () => {
@@ -245,6 +278,17 @@ export function ProviderSelector() {
                   <p className="mt-0.5 text-xs text-tertiary">
                     Model: {p.model_name}
                   </p>
+                  <p className="mt-0.5 text-[11px] text-tertiary">
+                    API Key:{' '}
+                    <span
+                      className="select-none font-mono"
+                      onCopy={preventSecretCopy}
+                      onCut={preventSecretCopy}
+                      onContextMenu={preventSecretCopy}
+                    >
+                      {p.masked_api_key || (p.has_api_key ? 'Tersimpan di server' : 'Belum disimpan')}
+                    </span>
+                  </p>
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2">
@@ -292,13 +336,27 @@ export function ProviderSelector() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-4 card-gemini p-4 sm:p-6">
-        <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">Add Provider</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">
+            {editingProviderId ? 'Edit Provider' : 'Add Provider'}
+          </h2>
+          {editingProviderId && (
+            <button
+              type="button"
+              onClick={cancelEdit}
+              className="rounded-xl border border-subtle px-3 py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
+            >
+              Cancel
+            </button>
+          )}
+        </div>
 
         <div>
           <label className="mb-1.5 block text-sm text-secondary">Provider</label>
           <select
             value={form.provider_name}
             onChange={(e) => setForm({ ...EMPTY_FORM, provider_name: e.target.value })}
+            disabled={!!editingProviderId}
             className="input-gemini"
           >
             {PROVIDER_OPTIONS.map((opt) => (
@@ -336,12 +394,22 @@ export function ProviderSelector() {
 
         <div>
           <label className="mb-1.5 block text-sm text-secondary">API Key</label>
+          {editingProviderId && editingMaskedKey && (
+            <p
+              className="mb-2 select-none font-mono text-xs text-tertiary"
+              onCopy={preventSecretCopy}
+              onCut={preventSecretCopy}
+              onContextMenu={preventSecretCopy}
+            >
+              API key tersimpan: {editingMaskedKey}
+            </p>
+          )}
           <input
             type="password"
             value={form.api_key}
             onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-            placeholder="sk-..."
-            required
+            placeholder={editingProviderId ? 'Kosongkan jika hanya ingin mengubah model/base URL' : 'Masukkan API key'}
+            required={!editingProviderId}
             className="input-gemini"
           />
         </div>
@@ -349,10 +417,10 @@ export function ProviderSelector() {
         <div className="flex gap-3">
           <button
             type="submit"
-            disabled={!form.api_key || !form.model_name || saving || testing}
+            disabled={!form.model_name || (!editingProviderId && !form.api_key) || saving || testing}
             className="btn-gradient flex-1 py-2.5 sm:py-3 text-sm font-semibold"
           >
-            {saving ? 'Saving...' : 'Save & Test Connection'}
+            {saving ? 'Saving...' : editingProviderId ? 'Save Changes & Test' : 'Save & Test Connection'}
           </button>
           <button
             type="button"

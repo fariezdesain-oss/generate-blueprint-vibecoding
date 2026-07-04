@@ -3,7 +3,7 @@ import { createClient } from '@/lib/db/supabaseServerClient';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
-import { FILE_ORDER } from '@/lib/utils/sequentialPrompts';
+import { hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { processSequential, processN8nSync } from '@/lib/utils/generate';
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('user_id, generation_status')
+    .select('*')
     .eq('id', sessionId)
     .single();
 
@@ -55,9 +55,7 @@ export async function POST(req: Request) {
       .single();
 
     const files = (filesCount.data?.generated_files as Record<string, string>) || {};
-    const existingCount = Object.keys(files).length;
-
-    if (existingCount >= FILE_ORDER.length) {
+    if (hasAllSpecFiles(files)) {
       return NextResponse.json(
         { success: false, error: { code: 'ALREADY_COMPLETED', message: 'Semua dokumen sudah selesai dibuat. Tidak perlu resume.' } },
         { status: 400 },
@@ -115,7 +113,7 @@ export async function POST(req: Request) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId);
+  try { await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
 
   try {
     if (mode === 'n8n') {
@@ -124,12 +122,12 @@ export async function POST(req: Request) {
       await processSequential(supabaseAdmin, sessionId, messages, aiConfig);
     }
 
-    await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId);
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode, resumed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId);
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },
