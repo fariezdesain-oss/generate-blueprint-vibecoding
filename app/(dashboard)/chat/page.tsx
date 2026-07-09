@@ -1,10 +1,15 @@
-import { Suspense } from 'react';
-import { ChatContent } from './ChatContent';
+'use client';
+
+import dynamic from 'next/dynamic';
+
+const ChatContent = dynamic(
+  () => import('./ChatContent').then((mod) => mod.ChatContent),
+  {
+    ssr: false,
+    loading: () => <div className="flex flex-1" />,
+  },
+);
 
 export default function ChatPage() {
-  return (
-    <Suspense fallback={<div className="flex flex-1" />}>
-      <ChatContent />
-    </Suspense>
-  );
+  return <ChatContent />;
 }
