@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useChatStore } from '@/store/useChatStore';
 import { ChatWindow } from '@/components/ui/ChatWindow';
 import { Send, FileText, Square } from 'lucide-react';
@@ -9,7 +9,7 @@ import { FILE_ORDER, FILE_LABELS, countGeneratedSpecFiles, getNextMissingSpecFil
 import { FilePicker } from '@/components/ui/FilePicker';
 import type { Attachment } from '@/types/chat';
 
-export function ChatContent() {
+export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null }) {
   const [input, setInput] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -27,8 +27,9 @@ export function ChatContent() {
   const [showModePicker, setShowModePicker] = useState(false);
   const [pickingMode, setPickingMode] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const searchParams = useSearchParams();
   const router = useRouter();
+
+  const sessionIdUrlParam = sessionIdParam;
 
   const sessionId = useChatStore((s) => s.sessionId);
   const setSessionId = useChatStore((s) => s.setSessionId);
@@ -90,7 +91,6 @@ export function ChatContent() {
     return content.toLowerCase().includes('generate ulang dari awal');
   };
 
-  const sessionIdUrlParam = searchParams.get('id');
   const switchingSession = !!sessionIdUrlParam && sessionId !== sessionIdUrlParam;
 
   useEffect(() => {
