@@ -2,13 +2,22 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Menu, X, Sparkles } from 'lucide-react';
-import { SidebarHistory } from './SidebarHistory';
-import { LogoutButton } from './LogoutButton';
+import { useRouter } from 'next/navigation';
+import { Menu, X, Sparkles, Plus, History, Settings, LogOut } from 'lucide-react';
 import { ProviderBadge } from './ProviderBadge';
+import { useChatStore } from '@/store/useChatStore';
 
 export function MobileNav() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const resetChatStore = useChatStore((s) => s.reset);
+
+  const handleNewChat = () => {
+    resetChatStore();
+    sessionStorage.removeItem('activeSessionId');
+    router.push('/chat');
+    setOpen(false);
+  };
 
   return (
     <>
@@ -63,12 +72,19 @@ export function MobileNav() {
 
             <nav className="mb-4 flex flex-col gap-1">
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-tertiary">Navigasi</p>
+              <button
+                onClick={handleNewChat}
+                className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+              >
+                <Plus size={16} className="text-gemini-blue" />
+                New Chat
+              </button>
               <Link
                 href="/history"
                 onClick={() => setOpen(false)}
                 className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
               >
-                <span className="size-1.5 rounded-full bg-tertiary group-hover:bg-gemini-blue transition-colors" />
+                <History size={16} />
                 History
               </Link>
               <Link
@@ -76,17 +92,25 @@ export function MobileNav() {
                 onClick={() => setOpen(false)}
                 className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
               >
-                <span className="size-1.5 rounded-full bg-tertiary group-hover:bg-gemini-blue transition-colors" />
+                <Settings size={16} />
                 Settings
               </Link>
             </nav>
 
-            <div className="mb-4 flex-1 overflow-y-auto">
-              <SidebarHistory onItemClick={() => setOpen(false)} />
-            </div>
-
-            <div className="mb-4">
-              <LogoutButton />
+            <div className="mt-auto">
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  fetch('/api/auth/logout', { method: 'POST' }).then(() => {
+                    sessionStorage.clear();
+                    router.push('/login');
+                  });
+                }}
+                className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
             </div>
           </aside>
         </div>

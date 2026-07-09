@@ -4,6 +4,8 @@ import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
+import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
+import { rateLimitResponse } from '@/lib/utils/rateLimit';
 
 const TEST_TIMEOUT_MS = 18000;
 
@@ -27,6 +29,9 @@ export async function POST(req: Request) {
       { status: 401 },
     );
   }
+
+  const limited = rateLimitResponse(`${userData.user.id}:provider-test`, 10, 60_000);
+  if (limited) return limited;
 
   const body = await req.json();
   const { provider_name, api_key, model_name, base_url, provider_id } = body;
@@ -65,12 +70,19 @@ export async function POST(req: Request) {
     );
   }
 
+  const capabilities = detectModelCapabilities(resolvedName, resolvedModel);
+
   const aiConfig: AIProviderConfig = {
     providerName: resolvedName,
     apiKey: resolvedKey,
     modelName: resolvedModel,
     baseUrl: resolvedBaseUrl,
     maxTokens: 16,
+    contextLevel: capabilities.contextLevel,
+    timeoutMs: capabilities.timeoutMs,
+    retryCount: capabilities.retryCount,
+    previewLimit: capabilities.previewLimit,
+    consistencyMode: capabilities.consistencyMode,
   };
 
   try {
@@ -80,7 +92,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      data: { message: `Berhasil terhubung ke ${resolvedName} / ${resolvedModel}` },
+      data: {
+        message: `Berhasil terhubung ke ${resolvedName} / ${resolvedModel}. Mode konteks: ${capabilities.contextLevel}.`,
+        capabilities,
+      },
     });
   } catch (err) {
     if (err instanceof Error && err.message === 'AI_TEST_TIMEOUT') {

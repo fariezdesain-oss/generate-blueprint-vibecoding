@@ -1,35 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
-
-async function retryAI(
-  provider: any,
-  prompt: string,
-  config: AIProviderConfig,
-  maxAttempts: number = 3,
-): Promise<string> {
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      return await provider.generateChat(prompt, config);
-    } catch (err: any) {
-      if (attempt < maxAttempts - 1) {
-        const msg = err?.message || '';
-        const isRateLimit = msg.includes('quota') || msg.includes('rate') || msg.includes('429');
-        const delay = isRateLimit ? 30000 * (attempt + 1) : 2000 * Math.pow(2, attempt);
-        console.log(`AI retry ${attempt + 1}/${maxAttempts} after ${delay}ms: ${msg.slice(0, 100)}`);
-        await new Promise(r => setTimeout(r, delay));
-      } else {
-        throw err;
-      }
-    }
-  }
-  throw new Error('AI call failed after all retries');
-}
+import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
+import { buildProviderFallbackCandidates } from '@/lib/utils/providerFallback';
+import { generateWithProviderFallback } from '@/lib/utils/generate';
+import { rateLimitResponse } from '@/lib/utils/rateLimit';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -41,6 +20,9 @@ export async function POST(req: Request) {
       { status: 401 },
     );
   }
+
+  const limited = rateLimitResponse(`${userData.user.id}:generate`, 20, 10 * 60_000);
+  if (limited) return limited;
 
   const { session_id, file_index, preview_limit } = await req.json();
 
@@ -86,22 +68,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: providerConfig } = await supabase
+  const { data: providerConfigs } = await supabase
     .from('provider_configs')
-    .select('*')
+    .select('id, provider_name, model_name, api_key, base_url, is_active, created_at')
     .eq('user_id', userData.user.id)
-    .eq('is_active', true)
-    .single();
+    .order('created_at', { ascending: true });
 
+  const providerConfig = providerConfigs?.find((config) => config.is_active) || providerConfigs?.[0];
   const decryptedKey = providerConfig?.api_key ? decrypt(providerConfig.api_key) : '';
 
+  const providerName = providerConfig?.provider_name || 'gemini';
+  const modelName = providerConfig?.model_name || 'gemini-2.5-flash';
+  const capabilities = detectModelCapabilities(providerName, modelName);
+
   const aiConfig: AIProviderConfig = {
-    providerName: providerConfig?.provider_name || 'gemini',
+    providerName,
     apiKey: decryptedKey || '',
-    modelName: providerConfig?.model_name || 'gemini-2.5-flash',
+    modelName,
     baseUrl: providerConfig?.base_url || undefined,
-    maxTokens: 32000,
+    maxTokens: capabilities.maxTokens,
+    contextLevel: capabilities.contextLevel,
+    timeoutMs: capabilities.timeoutMs,
+    retryCount: capabilities.retryCount,
+    previewLimit: capabilities.previewLimit,
+    consistencyMode: capabilities.consistencyMode,
   };
+
+  const fallbackCandidates = buildProviderFallbackCandidates(providerConfigs || []);
 
   if (!aiConfig.apiKey) {
     return NextResponse.json(
@@ -111,12 +104,18 @@ export async function POST(req: Request) {
   }
 
   try {
-    const provider = createProvider(aiConfig.providerName);
-    const prompt = buildFilePrompt(file_index, messages, existingFiles, preview_limit || 0);
+    const buildPromptForConfig = (config: AIProviderConfig) => buildFilePrompt(
+      file_index,
+      messages,
+      existingFiles,
+      preview_limit ?? config.previewLimit ?? 0,
+      config.contextLevel || 'high',
+    );
 
+    const initialPrompt = buildPromptForConfig(aiConfig);
     const insufficientPrefix = 'INSUFFICIENT_CONTEXT:';
-    if (prompt.trim().startsWith(insufficientPrefix)) {
-      const userMessage = prompt.trim().slice(insufficientPrefix.length).trim();
+    if (initialPrompt.trim().startsWith(insufficientPrefix)) {
+      const userMessage = initialPrompt.trim().slice(insufficientPrefix.length).trim();
       return NextResponse.json(
         {
           success: false,
@@ -129,7 +128,8 @@ export async function POST(req: Request) {
       );
     }
 
-    let aiResponse = await retryAI(provider, prompt, aiConfig, 3);
+    let result = await generateWithProviderFallback(fallbackCandidates, buildPromptForConfig);
+    let aiResponse = result.response;
 
     const fileName = FILE_ORDER[file_index];
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
@@ -144,8 +144,9 @@ export async function POST(req: Request) {
 
     const hasPlaceholder = placeholderPatterns.some(p => p.test(fileContent));
     if (hasPlaceholder) {
-      const correctionPrompt = `${prompt}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
-      aiResponse = await retryAI(provider, correctionPrompt, aiConfig, 2);
+      const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
+      result = await generateWithProviderFallback(fallbackCandidates, () => correctionPrompt, 2);
+      aiResponse = result.response;
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 

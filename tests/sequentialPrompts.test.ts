@@ -16,6 +16,8 @@ describe('sequentialPrompts', () => {
       '05_DESIGN_SYSTEM.md',
       '06_DELIVERY.md',
       '07_AGENT_CONTEXT.md',
+      '08_TASKS.md',
+      '09_AI_RULES.md',
     ]);
   });
 
@@ -35,7 +37,7 @@ describe('sequentialPrompts', () => {
   it('should detect when all current spec files exist', () => {
     const files = Object.fromEntries(FILE_ORDER.map((name) => [name, `# ${name}\n\nContent`])) as Record<string, string>;
 
-    expect(countGeneratedSpecFiles(files)).toBe(7);
+    expect(countGeneratedSpecFiles(files)).toBe(9);
     expect(hasAllSpecFiles(files)).toBe(true);
     expect(getNextMissingSpecFile(files)).toBe('');
   });
@@ -46,5 +48,26 @@ describe('sequentialPrompts', () => {
     expect(prompt).toContain('01_PRD.md');
     expect(prompt).toContain('HANYA membahas "apa yang dibangun"');
     expect(prompt).toContain('Jangan membahas database, API, struktur folder, desain visual');
+  });
+
+  it('should generate atomic tasks prompt for low-context AI implementation', () => {
+    const prompt = buildFilePrompt(7, [{ role: 'user', content: 'Saya ingin membuat aplikasi booking klinik.' }], {
+      '01_PRD.md': '# 01_PRD.md\n\nAplikasi booking klinik',
+    }, 900, 'low');
+
+    expect(prompt).toContain('08_TASKS.md');
+    expect(prompt).toContain('task atomic');
+    expect(prompt).toContain('MODE LOW-CONTEXT');
+    expect(prompt).toContain('model AI gratis/9router');
+  });
+
+  it('should generate AI rules prompt for implementation guardrails', () => {
+    const prompt = buildFilePrompt(8, [{ role: 'user', content: 'Saya ingin membuat aplikasi booking klinik.' }], {
+      '01_PRD.md': '# 01_PRD.md\n\nAplikasi booking klinik',
+    });
+
+    expect(prompt).toContain('09_AI_RULES.md');
+    expect(prompt).toContain('jangan refactor liar');
+    expect(prompt).toContain('Prompt template siap pakai');
   });
 });

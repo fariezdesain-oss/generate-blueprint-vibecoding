@@ -10,6 +10,7 @@ interface ProviderItem {
   has_api_key?: boolean;
   masked_api_key?: string;
   base_url?: string;
+  context_level?: 'low' | 'medium' | 'high';
   is_active: boolean;
 }
 
@@ -278,6 +279,11 @@ export function ProviderSelector() {
                   <p className="mt-0.5 text-xs text-tertiary">
                     Model: {p.model_name}
                   </p>
+                  {p.context_level && (
+                    <p className="mt-1 text-[11px] text-tertiary">
+                      Generate mode: <span className="font-medium text-secondary">{p.context_level.toUpperCase()} CONTEXT</span>
+                    </p>
+                  )}
                   <p className="mt-0.5 text-[11px] text-tertiary">
                     API Key:{' '}
                     <span

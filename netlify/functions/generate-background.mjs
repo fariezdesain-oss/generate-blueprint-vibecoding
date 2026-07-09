@@ -9,6 +9,8 @@ const FILE_ORDER = [
   '05_DESIGN_SYSTEM.md',
   '06_DELIVERY.md',
   '07_AGENT_CONTEXT.md',
+  '08_TASKS.md',
+  '09_AI_RULES.md',
 ];
 
 const ALGORITHM = 'aes-256-gcm';
@@ -50,6 +52,55 @@ function countGeneratedSpecFiles(files) {
   return FILE_ORDER.filter(name => typeof files[name] === 'string' && files[name].trim().length > 0).length;
 }
 
+function isFallbackableAIError(err) {
+  const message = err?.message || String(err || '');
+  return /timeout|quota|rate|429|500|502|503|504|service unavailable|overloaded|temporarily unavailable|payment required|insufficient.*credit|credit.*exhaust|resource exhausted|empty response|failed to generate/i.test(message);
+}
+
+function detectModelCapabilities(providerName, modelName) {
+  const provider = providerName.toLowerCase();
+  const model = modelName.toLowerCase();
+  const low = /free|8b|7b|(^|[-_/:])mini($|[-_/:])|(^|[-_/:])small($|[-_/:])|flash-lite|gemma|llama-3\.1-8b|llama-3\.2-3b/i.test(model);
+  const high = /gemini-1\.5-pro|gemini-1\.5-flash|gemini-2\.|claude-3\.?5|claude-3\.?7|claude-sonnet-4|gpt-4o|gpt-4\.1|o1|o3|128k|200k|1m/i.test(model) || provider === 'gemini';
+
+  if (low) return { contextLevel: 'low', maxTokens: 12000, previewLimit: 900, timeoutMs: provider === 'groq' ? 90000 : 150000, retryCount: 4, consistencyMode: 'light' };
+  if (high) return { contextLevel: 'high', maxTokens: 32000, previewLimit: 3000, timeoutMs: 240000, retryCount: 3, consistencyMode: 'full' };
+  return { contextLevel: 'medium', maxTokens: 20000, previewLimit: 1600, timeoutMs: 180000, retryCount: 3, consistencyMode: 'light' };
+}
+
+function buildAIConfig(row) {
+  const capabilities = detectModelCapabilities(row.provider_name || 'gemini', row.model_name || 'gemini-2.5-flash');
+  return {
+    providerName: row.provider_name || 'gemini',
+    apiKey: decrypt(row.api_key),
+    modelName: row.model_name || 'gemini-2.5-flash',
+    baseUrl: row.base_url || undefined,
+    maxTokens: capabilities.maxTokens,
+    contextLevel: capabilities.contextLevel,
+    timeoutMs: capabilities.timeoutMs,
+    retryCount: capabilities.retryCount,
+    previewLimit: capabilities.previewLimit,
+    consistencyMode: capabilities.consistencyMode,
+  };
+}
+
+function buildProviderFallbackCandidates(rows) {
+  const active = rows.filter(row => row.api_key && row.api_key.length > 0);
+  const primary = active.find(row => row.is_active) || active[0];
+  if (!primary) return [];
+  const scores = { high: 3, medium: 2, low: 1 };
+  const fallbackRows = active
+    .filter(row => row.id !== primary.id)
+    .sort((a, b) => {
+      const ac = detectModelCapabilities(a.provider_name, a.model_name);
+      const bc = detectModelCapabilities(b.provider_name, b.model_name);
+      const diff = scores[bc.contextLevel] - scores[ac.contextLevel];
+      if (diff !== 0) return diff;
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+  return [primary, ...fallbackRows].map(row => ({ id: row.id, config: buildAIConfig(row), isPrimary: row.id === primary.id })).filter(c => c.config.apiKey);
+}
+
 async function callAI(prompt, config) {
   const isGemini = config.providerName === 'gemini';
   const maxTokens = config.maxTokens || 32000;
@@ -78,7 +129,7 @@ async function callAI(prompt, config) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 600000);
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 600000);
 
   try {
     const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
@@ -91,15 +142,45 @@ async function callAI(prompt, config) {
 
     if (isGemini) {
       const json = await res.json();
-      return json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (!text.trim()) throw new Error('AI empty response');
+      return text;
     } else {
       const json = await res.json();
-      return json.choices?.[0]?.message?.content || '';
+      const text = json.choices?.[0]?.message?.content || '';
+      if (!text.trim()) throw new Error('AI empty response');
+      return text;
     }
   } catch (err) {
     clearTimeout(timeout);
     throw err;
   }
+}
+
+async function generateWithProviderFallback(candidates, buildPromptForConfig, maxAttemptsOverride) {
+  let lastError;
+  for (const candidate of candidates) {
+    const prompt = buildPromptForConfig(candidate.config);
+    const maxAttempts = maxAttemptsOverride || candidate.config.retryCount || 3;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await callAI(prompt, candidate.config);
+        return { response, config: candidate.config, usedFallback: !candidate.isPrimary };
+      } catch (err) {
+        lastError = err;
+        const msg = err.message || '';
+        const retryable = isFallbackableAIError(err);
+        if (attempt < maxAttempts - 1 && retryable) {
+          const delay = /quota|rate|429/i.test(msg) ? 30000 * (attempt + 1) : 5000 * Math.pow(2, attempt);
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        if (!retryable) throw err;
+        break;
+      }
+    }
+  }
+  throw lastError || new Error('AI generation failed on all providers');
 }
 
 function formatConversation(messages) {
@@ -128,7 +209,7 @@ function formatOtherFiles(files, previewLimit) {
 const BASE_SYSTEM = `Anda adalah senior software architect dan technical writer. Output Anda harus presisi, terstruktur, dan lengkap. WAJIB GUNAKAN BAHASA INDONESIA.
 
 ATURAN KUALITAS:
-1. KONSISTENSI - 7 dokumen dalam satu proyek HARUS konsisten satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika ada konflik, ikuti 01_PRD.md.
+1. KONSISTENSI - 9 dokumen dalam satu proyek HARUS konsisten satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika ada konflik, ikuti 01_PRD.md.
 2. BATAS DOKUMEN - tulis hanya topik yang diminta pada dokumen saat ini. Jangan mencampur PRD, arsitektur, data model, standar proyek, design system, delivery, dan agent context.
 3. DILARANG placeholder - jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
@@ -138,13 +219,13 @@ function buildConsistencyPrompt(files) {
   const prdContent = files ? files['01_PRD.md'] : null;
   if (!prdContent) return '';
 
-  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI 7 dokumen spesifikasi proyek berikut.
+  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI 9 dokumen spesifikasi proyek berikut.
 
 01_PRD.md adalah ACUAN UTAMA yang HARUS diikuti oleh SEMUA dokumen lainnya.
 
 Tugas Anda:
 1. Baca 01_PRD.md sebagai acuan utama.
-2. Baca dokumen 02 sampai 07.
+2. Baca dokumen 02 sampai 09.
 3. Periksa kontradiksi, istilah tidak selaras, fitur hilang, tech stack tidak konsisten, dan boundary dokumen yang tercampur.
 4. Jika SEMUA konsisten, balas hanya dengan teks: SEMUA KONSISTEN
 5. Jika ada yang perlu diperbaiki, keluarkan ULANG hanya file yang bermasalah secara LENGKAP, diawali dengan "# NAMAFILE.md".
@@ -162,7 +243,7 @@ ${prdContent}
   return prompt;
 }
 
-function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit) {
+function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit, contextLevel = 'high') {
   const fileName = FILE_ORDER[fileIndex];
   const conversation = formatConversation(messages);
   const prdSection = formatPRDFull(previousFiles);
@@ -321,12 +402,53 @@ WAJIB berisi secara ringkas:
 - Current Task
 - Next Task
 - Do Not Do
+- Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
 
 ATURAN KHUSUS:
 - Jangan panjang.
 - Jangan menambah informasi baru yang tidak ada di dokumen 01 sampai 06.
 - Pindahkan konsep checklist VIBECODING_STEPS lama hanya sebagai Progress, Current Task, Next Task, dan Blocked jika relevan.
+- Tulis jelas bahwa implementasi wajib dimulai dari 08_TASKS.md dan mengikuti 09_AI_RULES.md.
 - Format harus mudah dipakai AI saat sesi baru.`;
+      break;
+
+    case '08_TASKS.md':
+      filePrompt = `Buat dokumen 08_TASKS.md. Dokumen ini adalah daftar task atomic untuk proses vibecoding, terutama agar aman dipakai model AI gratis, lambat, atau low-context.
+
+WAJIB berisi:
+- Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
+- Phase pembangunan linear dari setup sampai release
+- Task atomic dengan format tabel: ID, Phase, Goal, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
+- Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
+- Aturan berhenti jika blocker muncul
+- Cara melanjutkan setelah task selesai
+
+ATURAN KHUSUS:
+- Jangan membuat task terlalu besar.
+- Jangan menggabungkan banyak fitur dalam satu task.
+- Pastikan setiap task menunjuk dokumen acuan yang relevan dari 01 sampai 07.
+- Tulis task agar user bisa copy-paste satu task ke model AI gratis/9router.`;
+      break;
+
+    case '09_AI_RULES.md':
+      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context.
+
+WAJIB berisi:
+- Cara memulai sesi AI baru
+- Urutan file yang wajib dibaca sebelum coding
+- Aturan context hemat untuk low-context model
+- Aturan menjalankan task dari 08_TASKS.md
+- Larangan: jangan refactor liar, jangan hapus fitur, jangan ubah scope tanpa izin, jangan menebak env secret, jangan lanjut jika konteks kurang
+- Kewajiban: rencana singkat, edit kecil, test sesuai task, lapor file berubah, lapor blocker
+- Prompt template siap pakai untuk user copy ke AI lain
+- Recovery flow jika AI error, timeout, atau kehilangan konteks
+- Quality checklist sebelum task dianggap selesai
+
+ATURAN KHUSUS:
+- Fokus pada instruksi operasional untuk AI implementer.
+- Jangan mengulang PRD panjang.
+- Jangan menambah fitur baru di luar dokumen sebelumnya.
+- Buat aturan tegas tapi tetap praktis untuk model AI gratis/9router.`;
       break;
 
     default:
@@ -336,10 +458,14 @@ ATURAN KHUSUS:
   const conversationSection = fileIndex === 0
     ? `\nCONVERSATION:\n${conversation}`
     : '';
+  const contextModeInstruction = contextLevel === 'low'
+    ? '\nMODE LOW-CONTEXT:\n- Tulis padat, tetap lengkap secara operasional.\n- Prioritaskan poin penting, tabel, dan checklist.\n- Hindari pengulangan panjang dari dokumen referensi.\n- Jika detail perlu dipecah, buat struktur task kecil yang mudah dilanjutkan.'
+    : '';
 
   return `${BASE_SYSTEM}
 
 ${filePrompt}
+${contextModeInstruction}
 ${contextSection}
 
 OUTPUT FORMAT:
@@ -353,7 +479,7 @@ ${conversationSection}
 Generate only the file ${fileName} now.`;
 }
 
-async function generateDocs(supabase, sessionId, messages, config) {
+async function generateDocs(supabase, sessionId, messages, config, fallbackCandidates) {
   const { data: session } = await supabase
     .from('sessions')
     .select('generated_files')
@@ -361,35 +487,21 @@ async function generateDocs(supabase, sessionId, messages, config) {
     .single();
 
   let existingFiles = (session?.generated_files || {});
-  let previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? 2000 : 0;
+  let previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (config.previewLimit || 2000) : 0;
 
   for (let i = 0; i < FILE_ORDER.length; i++) {
     const fileName = FILE_ORDER[i];
 
     if (existingFiles[fileName]) continue;
 
-    const prompt = buildDocPrompt(i, messages, existingFiles, previewLimit);
+    const candidates = fallbackCandidates && fallbackCandidates.length ? fallbackCandidates : [{ id: 'primary', config, isPrimary: true }];
+    const buildPromptForConfig = candidateConfig => {
+      const candidatePreviewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (candidateConfig.previewLimit || previewLimit || 2000) : 0;
+      return buildDocPrompt(i, messages, existingFiles, candidatePreviewLimit, candidateConfig.contextLevel || 'high');
+    };
 
-    let aiResponse = '';
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        aiResponse = await callAI(prompt, config);
-        if (aiResponse) break;
-      } catch (err) {
-        const msg = err.message || '';
-        const isRetryable = msg.includes('quota') || msg.includes('rate') || msg.includes('429');
-        if (attempt < 2) {
-          const delay = isRetryable ? 30000 * (attempt + 1) : 5000 * Math.pow(2, attempt);
-          console.log(`Retry ${fileName} attempt ${attempt + 1} after ${delay}ms: ${msg.slice(0, 100)}`);
-          await new Promise(r => setTimeout(r, delay));
-        }
-      }
-    }
-
-    if (!aiResponse) {
-      throw new Error(`Failed to generate ${fileName} after 3 attempts`);
-    }
+    let result = await generateWithProviderFallback(candidates, buildPromptForConfig);
+    let aiResponse = result.response;
 
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
@@ -403,17 +515,9 @@ async function generateDocs(supabase, sessionId, messages, config) {
     const hasPlaceholder = placeholderPatterns.some(p => p.test(fileContent));
 
     if (hasPlaceholder) {
-      const correctionPrompt = `${prompt}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          aiResponse = await callAI(correctionPrompt, config);
-          break;
-        } catch (err) {
-          if (attempt < 1) {
-            await new Promise(r => setTimeout(r, 5000 * Math.pow(2, attempt)));
-          }
-        }
-      }
+      const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
+      result = await generateWithProviderFallback(candidates, () => correctionPrompt, 2);
+      aiResponse = result.response;
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
@@ -447,7 +551,7 @@ async function generateDocs(supabase, sessionId, messages, config) {
     await new Promise(r => setTimeout(r, 1500));
 
     if (countGeneratedSpecFiles(existingFiles) > 2) {
-      previewLimit = 2000;
+      previewLimit = config.previewLimit || 2000;
     }
   }
 
@@ -459,10 +563,12 @@ async function generateDocs(supabase, sessionId, messages, config) {
     .single();
   existingFiles = latestBeforeConsistency?.generated_files || existingFiles;
 
-  const consistencyPrompt = buildConsistencyPrompt(existingFiles);
+  const candidates = fallbackCandidates && fallbackCandidates.length ? fallbackCandidates : [{ id: 'primary', config, isPrimary: true }];
+  const consistencyPrompt = config.consistencyMode === 'light' ? '' : buildConsistencyPrompt(existingFiles);
   if (consistencyPrompt) {
     try {
-      const consistencyResponse = await callAI(consistencyPrompt, config);
+      const consistencyResult = await generateWithProviderFallback(candidates, () => consistencyPrompt, 2);
+      const consistencyResponse = consistencyResult.response;
       if (!consistencyResponse.includes('SEMUA KONSISTEN')) {
         const sections = consistencyResponse.split(/\n(?=# .+\.md)/);
         let repairedCount = 0;
@@ -815,6 +921,14 @@ export default async (req) => {
     });
   }
 
+  const backgroundSecret = process.env.BACKGROUND_SECRET;
+  if (backgroundSecret && req.headers.get('X-Background-Secret') !== backgroundSecret) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
   let body;
   try {
     body = await req.json();
@@ -896,12 +1010,21 @@ export default async (req) => {
       });
     }
 
+    const providerName = providerConfig.provider_name || 'gemini';
+    const modelName = providerConfig.model_name || 'gemini-2.5-flash';
+    const capabilities = detectModelCapabilities(providerName, modelName);
+
     const aiConfig = {
-      providerName: providerConfig.provider_name || 'gemini',
+      providerName,
       apiKey,
-      modelName: providerConfig.model_name || 'gemini-2.5-flash',
+      modelName,
       baseUrl: providerConfig.base_url || undefined,
-      maxTokens: 32000,
+      maxTokens: capabilities.maxTokens,
+      contextLevel: capabilities.contextLevel,
+      timeoutMs: capabilities.timeoutMs,
+      retryCount: capabilities.retryCount,
+      previewLimit: capabilities.previewLimit,
+      consistencyMode: capabilities.consistencyMode,
     };
 
     await supabase
@@ -912,7 +1035,12 @@ export default async (req) => {
     if (mode === 'n8n') {
       await generateN8n(supabase, sessionId, messages, aiConfig);
     } else {
-      await generateDocs(supabase, sessionId, messages, aiConfig);
+      const { data: allProviders } = await supabase
+        .from('provider_configs')
+        .select('id, provider_name, model_name, api_key, base_url, is_active, created_at')
+        .eq('user_id', session.user_id);
+      const fallbackCandidates = buildProviderFallbackCandidates(allProviders || []);
+      await generateDocs(supabase, sessionId, messages, aiConfig, fallbackCandidates);
     }
 
     await supabase

@@ -6,6 +6,8 @@ import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { processSequential, processN8nSync } from '@/lib/utils/generate';
+import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
+import { rateLimitResponse } from '@/lib/utils/rateLimit';
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -17,6 +19,9 @@ export async function POST(req: Request) {
       { status: 401 },
     );
   }
+
+  const limited = rateLimitResponse(`${userData.user.id}:generate`, 6, 10 * 60_000);
+  if (limited) return limited;
 
   const { sessionId, mode } = await req.json();
 
@@ -79,12 +84,21 @@ export async function POST(req: Request) {
 
   const decryptedKey = providerConfig?.api_key ? decrypt(providerConfig.api_key) : '';
 
+  const providerName = providerConfig?.provider_name || 'gemini';
+  const modelName = providerConfig?.model_name || 'gemini-2.5-flash';
+  const capabilities = detectModelCapabilities(providerName, modelName);
+
   const aiConfig: AIProviderConfig = {
-    providerName: providerConfig?.provider_name || 'gemini',
+    providerName,
     apiKey: decryptedKey || '',
-    modelName: providerConfig?.model_name || 'gemini-2.5-flash',
+    modelName,
     baseUrl: providerConfig?.base_url || undefined,
-    maxTokens: 32000,
+    maxTokens: capabilities.maxTokens,
+    contextLevel: capabilities.contextLevel,
+    timeoutMs: capabilities.timeoutMs,
+    retryCount: capabilities.retryCount,
+    previewLimit: capabilities.previewLimit,
+    consistencyMode: capabilities.consistencyMode,
   };
 
   if (!aiConfig.apiKey) {
@@ -113,21 +127,21 @@ export async function POST(req: Request) {
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
 
-  try { await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
+  try { await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
 
   try {
     if (mode === 'n8n') {
-      await processN8nSync(supabaseAdmin, sessionId, messages, aiConfig);
+      await processN8nSync(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig);
     } else {
-      await processSequential(supabaseAdmin, sessionId, messages, aiConfig);
+      await processSequential(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig);
     }
 
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode, resumed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId); } catch { /* kolom mungkin belum ada */ }
+    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },

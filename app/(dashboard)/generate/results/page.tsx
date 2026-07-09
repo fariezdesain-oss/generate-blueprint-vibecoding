@@ -2,189 +2,23 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { Copy, Download, FileText, Archive, RefreshCw, Sparkles, ChevronDown, Workflow } from 'lucide-react';
 import { FILE_ORDER, FILE_LABELS } from '@/lib/utils/sequentialPrompts';
 
-function renderMarkdown(md: string) {
-  const html: React.ReactNode[] = [];
-  const lines = md.split('\n');
-  let inCodeBlock = false;
-  let codeBuffer: string[] = [];
-  let codeLang = '';
-  let inTable = false;
-  let tableBuffer: string[][] = [];
-  let listStack: { type: 'ul' | 'ol'; items: React.ReactNode[] }[] = [];
-
-  function flushList() {
-    if (listStack.length > 0) {
-      const list = listStack[0];
-      const Tag = list.type === 'ul' ? 'ul' : 'ol';
-      const className = list.type === 'ul'
-        ? 'ml-5 mb-3 list-disc text-secondary'
-        : 'ml-5 mb-3 list-decimal text-secondary';
-      html.push(<Tag key={html.length} className={className}>{list.items.map((item, j) => <li key={j} className="mb-1">{item}</li>)}</Tag>);
-      listStack = [];
-    }
+const MarkdownRenderer = dynamic(
+  () => import('@/components/ui/MarkdownRenderer').then((m) => m.MarkdownRenderer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-3 p-4">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-4 rounded-lg bg-tertiary animate-pulse" style={{ width: `${70 + (i % 3) * 10}%` }} />
+        ))}
+      </div>
+    ),
   }
-
-  function flushTable() {
-    if (tableBuffer.length >= 2) {
-      const tableHtml = (
-        <div key={html.length} className="my-4 overflow-x-auto rounded-xl border border-[var(--border)]">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[var(--bg-tertiary)]">
-                {tableBuffer[0].map((h, j) => <th key={j} className="px-4 py-2.5 text-left font-bold text-primary border-b border-[var(--border)]">{renderInline(h)}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {tableBuffer.slice(1).map((row, j) => (
-                <tr key={j} className="border-t border-[var(--border)]">
-                  {row.map((c, k) => <td key={k} className="px-4 py-2 text-secondary">{renderInline(c)}</td>)}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      html.push(tableHtml);
-    }
-    tableBuffer = [];
-    inTable = false;
-  }
-
-  function renderInline(text: string) {
-    const parts: React.ReactNode[] = [];
-    let remaining = text;
-    let idx = 0;
-
-    while (remaining.length > 0) {
-      const codeMatch = remaining.match(/^`([^`]+)`/);
-      if (codeMatch) {
-        parts.push(<code key={idx++} className="rounded-md bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-gemini-blue border border-[var(--border)]">{codeMatch[1]}</code>);
-        remaining = remaining.slice(codeMatch[0].length);
-        continue;
-      }
-
-      const linkMatch = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
-      if (linkMatch) {
-        parts.push(<a key={idx++} href={linkMatch[2]} target="_blank" rel="noopener noreferrer" className="text-gemini-blue underline hover:text-gemini-teal">{linkMatch[1]}</a>);
-        remaining = remaining.slice(linkMatch[0].length);
-        continue;
-      }
-
-      const boldMatch = remaining.match(/^\*\*([^*]+)\*\*/);
-      if (boldMatch) {
-        parts.push(<strong key={idx++} className="font-bold text-primary">{boldMatch[1]}</strong>);
-        remaining = remaining.slice(boldMatch[0].length);
-        continue;
-      }
-
-      parts.push(remaining[0]);
-      remaining = remaining.slice(1);
-    }
-
-    return parts.length > 0 ? <>{parts}</> : text;
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.trimStart().startsWith('```')) {
-      if (inCodeBlock) {
-        html.push(
-          <pre key={html.length} className="my-3 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--bg-tertiary)] p-4 font-mono text-xs leading-relaxed text-primary">
-            {codeLang && <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-tertiary">{codeLang}</div>}
-            <code>{codeBuffer.join('\n')}</code>
-          </pre>
-        );
-        codeBuffer = [];
-        inCodeBlock = false;
-        codeLang = '';
-      } else {
-        flushList();
-        flushTable();
-        inCodeBlock = true;
-        codeLang = line.trimStart().slice(3).trim();
-      }
-      continue;
-    }
-
-    if (inCodeBlock) {
-      codeBuffer.push(line);
-      continue;
-    }
-
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('|') && trimmed.endsWith('|') && trimmed.includes('|')) {
-      const cols = trimmed.split('|').filter(c => c.trim() !== '').map(c => c.trim());
-      if (trimmed.includes('---') || trimmed.includes('--')) {
-        continue;
-      }
-      if (!inTable) {
-        flushList();
-        inTable = true;
-        tableBuffer = [cols];
-      } else {
-        tableBuffer.push(cols);
-      }
-      if (i === lines.length - 1 || !lines[i + 1]?.trim().startsWith('|')) {
-        flushTable();
-      }
-      continue;
-    } else if (inTable) {
-      flushTable();
-    }
-
-    if (trimmed.startsWith('### ')) {
-      flushList();
-      html.push(<h3 key={html.length} className="mt-6 mb-2 text-base font-extrabold text-primary">{trimmed.replace('### ', '')}</h3>);
-      continue;
-    }
-
-    if (trimmed.startsWith('## ')) {
-      flushList();
-      html.push(<h2 key={html.length} className="mt-8 mb-3 text-lg font-extrabold text-gemini-blue">{trimmed.replace('## ', '')}</h2>);
-      continue;
-    }
-
-    if (trimmed.startsWith('- ')) {
-      const itemContent = trimmed.replace(/^- /, '');
-      listStack.push({ type: 'ul', items: [renderInline(itemContent)] });
-      continue;
-    }
-
-    if (/^\d+\.\s/.test(trimmed)) {
-      const itemContent = trimmed.replace(/^\d+\.\s*/, '');
-      listStack.push({ type: 'ol', items: [renderInline(itemContent)] });
-      continue;
-    }
-
-    flushList();
-
-    if (trimmed === '') {
-      html.push(<div key={html.length} className="h-2" />);
-      continue;
-    }
-
-    html.push(<p key={html.length} className="mb-2 text-secondary">{renderInline(trimmed)}</p>);
-  }
-
-  flushList();
-  flushTable();
-
-  if (inCodeBlock && codeBuffer.length > 0) {
-    html.push(
-      <pre key={html.length} className="my-3 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--bg-tertiary)] p-4 font-mono text-xs leading-relaxed text-primary">
-        {codeLang && <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-tertiary">{codeLang}</div>}
-        <code>{codeBuffer.join('\n')}</code>
-      </pre>
-    );
-  }
-
-  return <>{html}</>;
-}
+);
 
 interface GenerateData {
   content?: string;
@@ -465,7 +299,7 @@ export default function GenerateResultsPage() {
                 </div>
               </div>
               <div className="prose prose-invert max-w-none text-sm leading-relaxed text-primary">
-                {renderMarkdown(n8nData.setup_instructions!)}
+                <MarkdownRenderer content={n8nData.setup_instructions!} />
               </div>
             </div>
           )}
@@ -612,9 +446,9 @@ export default function GenerateResultsPage() {
                 </div>
               </div>
               <div ref={contentRef} className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <pre className="whitespace-pre-wrap font-mono text-xs sm:text-sm font-semibold leading-loose text-primary">
-                  {files[activeFile]}
-                </pre>
+                <div className="mx-auto max-w-3xl">
+                  <MarkdownRenderer content={files[activeFile]} />
+                </div>
               </div>
             </>
           ) : (

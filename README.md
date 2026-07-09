@@ -114,7 +114,7 @@ npm run test:e2e
 
 ## Dokumentasi Tambahan
 
-Generator dokumentasi proyek menghasilkan 7 file bernomor:
+Generator dokumentasi proyek menghasilkan 9 file bernomor:
 
 - `01_PRD.md`
 - `02_ARCHITECTURE.md`
@@ -123,5 +123,9 @@ Generator dokumentasi proyek menghasilkan 7 file bernomor:
 - `05_DESIGN_SYSTEM.md`
 - `06_DELIVERY.md`
 - `07_AGENT_CONTEXT.md`
+- `08_TASKS.md`
+- `09_AI_RULES.md`
+
+Sistem otomatis mengklasifikasikan provider/model sebagai low, medium, atau high context. Model low-context memakai prompt lebih hemat dan task lebih atomic agar cocok untuk model gratis/9router.
 
 Dokumentasi internal aplikasi ini tetap tersedia di folder `docs/`.

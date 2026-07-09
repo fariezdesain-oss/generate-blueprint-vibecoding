@@ -3,6 +3,9 @@ import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, FILE_ORDER, FILE_LABELS, buildConsistencyPrompt, countGeneratedSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { buildN8nPrompt } from '@/lib/utils/n8nPrompt';
 import { validateN8nWorkflow } from '@/lib/utils/n8nValidator';
+import type { ProviderFallbackCandidate } from '@/lib/utils/providerFallback';
+import { isFallbackableAIError } from '@/lib/utils/providerFallback';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface GenerationProgress {
   currentFileIndex: number;
@@ -14,22 +17,34 @@ export interface GenerationProgress {
 }
 
 async function updateGenerationProgress(
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseClient,
   sessionId: string,
+  userId: string,
   progress: GenerationProgress,
 ) {
   try {
+    const { error } = await supabaseAdmin
+      .from('sessions')
+      .update({ generation_progress: progress, updated_at: new Date().toISOString() })
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    if (!error) return;
+
+    // ponytail: legacy fallback until all deployed DBs have generation_progress.
     const { data: session } = await supabaseAdmin
       .from('sessions')
       .select('generated_files')
       .eq('id', sessionId)
+      .eq('user_id', userId)
       .single();
     const files = (session?.generated_files as Record<string, unknown>) || {};
     files._progress = progress;
     await supabaseAdmin
       .from('sessions')
       .update({ generated_files: files, updated_at: new Date().toISOString() })
-      .eq('id', sessionId);
+      .eq('id', sessionId)
+      .eq('user_id', userId);
   } catch {
     // kolom mungkin belum ada — aman diabaikan
   }
@@ -46,13 +61,16 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 export async function retryAI(
   provider: any,
   prompt: string,
-  config: AIProviderConfig,
-  maxAttempts: number = 3,
-  timeoutMs: number = 120000,
+  _config: AIProviderConfig,
+  maxAttempts: number = _config.retryCount || 3,
+  timeoutMs: number = _config.timeoutMs || 120000,
 ): Promise<string> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      return await withTimeout(provider.generateChat(prompt, config), timeoutMs, 'AI generateChat');
+      const rawResponse = await withTimeout(provider.generateChat(prompt, _config), _config.timeoutMs || timeoutMs, 'AI generateChat');
+      const response = String(rawResponse || '');
+      if (!response.trim()) throw new Error('AI empty response');
+      return response;
     } catch (err: any) {
       if (attempt < maxAttempts - 1) {
         const msg = err?.message || '';
@@ -68,23 +86,52 @@ export async function retryAI(
   throw new Error('AI call failed after all retries');
 }
 
+export async function generateWithProviderFallback(
+  candidates: ProviderFallbackCandidate[],
+  buildPromptForConfig: (_config: AIProviderConfig) => string,
+  maxAttemptsOverride?: number,
+): Promise<{ response: string; config: AIProviderConfig; usedFallback: boolean }> {
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    const provider = createProvider(candidate.config.providerName);
+    const prompt = buildPromptForConfig(candidate.config);
+
+    try {
+      const response = await retryAI(provider, prompt, candidate.config, maxAttemptsOverride ?? candidate.config.retryCount ?? 3);
+      return { response, config: candidate.config, usedFallback: !candidate.isPrimary };
+    } catch (err) {
+      lastError = err;
+      if (!isFallbackableAIError(err)) throw err;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('AI generation failed on all providers');
+}
+
 export async function processSequential(
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseClient,
   sessionId: string,
+  userId: string,
   messages: { role: string; content: string }[],
   aiConfig: AIProviderConfig,
-) {
+  fallbackCandidates?: ProviderFallbackCandidate[],
+  maxFiles: number = Number.POSITIVE_INFINITY,
+): Promise<{ completed: boolean; generatedCount: number; totalFiles: number; nextFile: string }> {
   const { data: session } = await supabaseAdmin
     .from('sessions')
     .select('generated_files')
     .eq('id', sessionId)
+    .eq('user_id', userId)
     .single();
 
   let existingFiles = (session?.generated_files as Record<string, string>) || {};
-  const provider = createProvider(aiConfig.providerName);
+  const candidates = fallbackCandidates && fallbackCandidates.length > 0
+    ? fallbackCandidates
+    : [{ id: 'primary', config: aiConfig, isPrimary: true }];
 
   const pushProgress = async (i: number, fileName: string, progress: number, stage: GenerationProgress['stage'], message: string) => {
-    await updateGenerationProgress(supabaseAdmin, sessionId, {
+    await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
       currentFileIndex: i,
       currentFileName: fileName,
       currentFileProgress: progress,
@@ -94,18 +141,24 @@ export async function processSequential(
     });
   };
 
+  let generatedThisRun = 0;
+
   for (let i = 0; i < FILE_ORDER.length; i++) {
     const fileName = FILE_ORDER[i];
     if (existingFiles[fileName]) continue;
+    if (generatedThisRun >= maxFiles) break;
 
     const fileLabel = FILE_LABELS[fileName] || fileName;
 
     await pushProgress(i, fileName, 0, 'preparing', `Menganalisis konteks untuk ${fileLabel}...`);
-    const previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? 2000 : 0;
-    const prompt = buildFilePrompt(i, messages, existingFiles, previewLimit);
+    const buildPromptForConfig = (config: AIProviderConfig) => {
+      const previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (config.previewLimit ?? 2000) : 0;
+      return buildFilePrompt(i, messages, existingFiles, previewLimit, config.contextLevel || 'high');
+    };
 
     await pushProgress(i, fileName, 25, 'generating', `Menulis ${fileLabel}...`);
-    let aiResponse = await retryAI(provider, prompt, aiConfig, 3);
+    let result = await generateWithProviderFallback(candidates, buildPromptForConfig);
+    let aiResponse = result.response;
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
     await pushProgress(i, fileName, 70, 'generating', `Memeriksa kualitas ${fileLabel}...`);
@@ -117,8 +170,9 @@ export async function processSequential(
     ];
     if (placeholderPatterns.some(p => p.test(fileContent))) {
       await pushProgress(i, fileName, 80, 'fixing_placeholders', `Memperbaiki placeholder di ${fileLabel}...`);
-      const correctionPrompt = `${prompt}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder. HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP.`;
-      aiResponse = await retryAI(provider, correctionPrompt, aiConfig, 2);
+      const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder. HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP.`;
+      result = await generateWithProviderFallback(candidates, () => correctionPrompt, 2);
+      aiResponse = result.response;
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
@@ -127,6 +181,7 @@ export async function processSequential(
       .from('sessions')
       .select('generated_files')
       .eq('id', sessionId)
+      .eq('user_id', userId)
       .single();
 
     const latestFiles = (latestSession?.generated_files as Record<string, string>) || {};
@@ -141,12 +196,29 @@ export async function processSequential(
       generated_files: existingFiles,
       updated_at: new Date().toISOString(),
     };
-    await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId);
-    await new Promise(r => setTimeout(r, 1500));
+    await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
+    generatedThisRun++;
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  const generatedCount = countGeneratedSpecFiles(existingFiles);
+  const nextFile = FILE_ORDER.find((name) => !existingFiles[name] || existingFiles[name].trim().length === 0) || '';
+
+  if (generatedCount < FILE_ORDER.length) {
+    await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
+      currentFileIndex: Math.max(0, generatedCount - 1),
+      currentFileName: nextFile,
+      currentFileProgress: 0,
+      overallProgress: Math.round((generatedCount / FILE_ORDER.length) * 100),
+      stage: 'preparing',
+      message: `${generatedCount}/${FILE_ORDER.length} dokumen selesai. Lanjut ke ${nextFile}.`,
+    });
+
+    return { completed: false, generatedCount, totalFiles: FILE_ORDER.length, nextFile };
   }
 
   // Final consistency check against PRD
-  await updateGenerationProgress(supabaseAdmin, sessionId, {
+  await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
     currentFileIndex: FILE_ORDER.length - 1,
     currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
     currentFileProgress: 100,
@@ -159,13 +231,14 @@ export async function processSequential(
     .from('sessions')
     .select('generated_files')
     .eq('id', sessionId)
+    .eq('user_id', userId)
     .single();
   existingFiles = (latestBeforeConsistency?.generated_files as Record<string, string>) || existingFiles;
 
-  const consistencyPrompt = buildConsistencyPrompt(existingFiles);
+  const consistencyPrompt = aiConfig.consistencyMode === 'light' ? '' : buildConsistencyPrompt(existingFiles);
   if (consistencyPrompt) {
     try {
-      const consistencyResponse = await retryAI(provider, consistencyPrompt, aiConfig, 2);
+      const consistencyResponse = (await generateWithProviderFallback(candidates, () => consistencyPrompt, 2)).response;
       if (!consistencyResponse.includes('SEMUA KONSISTEN')) {
         const sections = consistencyResponse.split(/\n(?=# .+\.md)/);
         let repairedCount = 0;
@@ -183,14 +256,14 @@ export async function processSequential(
         if (repairedCount === 0) {
           throw new Error('Consistency check did not return valid document repairs');
         }
-        await supabaseAdmin.from('sessions').update({ generated_files: existingFiles, updated_at: new Date().toISOString() }).eq('id', sessionId);
+        await supabaseAdmin.from('sessions').update({ generated_files: existingFiles, updated_at: new Date().toISOString() }).eq('id', sessionId).eq('user_id', userId);
       }
     } catch (err) {
       throw err;
     }
   }
 
-  await updateGenerationProgress(supabaseAdmin, sessionId, {
+  await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
     currentFileIndex: FILE_ORDER.length - 1,
     currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
     currentFileProgress: 100,
@@ -202,7 +275,10 @@ export async function processSequential(
   await supabaseAdmin
     .from('sessions')
     .update({ generated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', sessionId);
+    .eq('id', sessionId)
+    .eq('user_id', userId);
+
+  return { completed: true, generatedCount: FILE_ORDER.length, totalFiles: FILE_ORDER.length, nextFile: '' };
 }
 
 function extractJson(text: string): string | null {
@@ -283,8 +359,9 @@ function autoFixWorkflow(workflow: Record<string, unknown>): { workflow: Record<
 }
 
 export async function processN8nSync(
-  supabaseAdmin: any,
+  supabaseAdmin: SupabaseClient,
   sessionId: string,
+  userId: string,
   messages: { role: string; content: string }[],
   aiConfig: AIProviderConfig,
 ) {
@@ -347,5 +424,5 @@ export async function processN8nSync(
     updateData.n8n_setup_instructions = parsed.setupInstructions;
   }
 
-  await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId);
+  await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
 }

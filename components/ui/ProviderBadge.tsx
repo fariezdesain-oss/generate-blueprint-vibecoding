@@ -2,10 +2,31 @@
 
 import { useEffect, useState } from 'react';
 
+const CACHE_KEY = 'vibe_provider_badge';
+const CACHE_TTL = 5 * 60 * 1000;
+
+interface CachedProvider {
+  label: string;
+  ts: number;
+}
+
 export function ProviderBadge() {
   const [label, setLabel] = useState('');
 
   useEffect(() => {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const parsed: CachedProvider = JSON.parse(cached);
+        if (Date.now() - parsed.ts < CACHE_TTL) {
+          setLabel(parsed.label);
+          return;
+        }
+      } catch {
+        localStorage.removeItem(CACHE_KEY);
+      }
+    }
+
     const fetchProvider = () => {
       fetch('/api/providers')
         .then((r) => r.json())
@@ -14,18 +35,27 @@ export function ProviderBadge() {
           const active = json.data.providers.find(
             (p: { is_active: boolean }) => p.is_active,
           );
-          if (active) {
-            setLabel(`${active.provider_name} / ${active.model_name}`);
-          } else {
-            setLabel('No Active Provider');
-          }
+          const newLabel = active
+            ? `${active.provider_name} / ${active.model_name}`
+            : 'No Active Provider';
+          setLabel(newLabel);
+          localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ label: newLabel, ts: Date.now() }),
+          );
         })
-        .catch(() => setLabel('No Active Provider'));
+        .catch(() => {});
     };
 
     fetchProvider();
-    window.addEventListener('provider-changed', fetchProvider);
-    return () => window.removeEventListener('provider-changed', fetchProvider);
+
+    const onProviderChanged = () => {
+      localStorage.removeItem(CACHE_KEY);
+      fetchProvider();
+    };
+
+    window.addEventListener('provider-changed', onProviderChanged);
+    return () => window.removeEventListener('provider-changed', onProviderChanged);
   }, []);
 
   if (!label) return null;

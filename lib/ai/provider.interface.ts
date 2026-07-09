@@ -4,6 +4,11 @@ export interface AIProviderConfig {
   modelName: string;
   baseUrl?: string;
   maxTokens?: number;
+  contextLevel?: 'low' | 'medium' | 'high';
+  timeoutMs?: number;
+  retryCount?: number;
+  previewLimit?: number;
+  consistencyMode?: 'light' | 'full';
 }
 
 export interface ContentFile {

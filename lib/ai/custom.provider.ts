@@ -52,7 +52,7 @@ export class OpenAICompatibleProvider implements AIProvider {
     const maxTokens = config.maxTokens ?? 32000;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs ?? 120000);
 
     try {
       const res = await fetch(`${baseUrl}/chat/completions`, {

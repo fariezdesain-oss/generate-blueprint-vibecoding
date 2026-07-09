@@ -1,24 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { ensureProfile } from '@/lib/db/ensureProfile';
 import { decrypt, encrypt } from '@/lib/utils/encryption';
 import { maskApiKey, serializeProviderConfig } from '@/lib/utils/providerConfig';
+import { withAuth } from '@/lib/utils/apiAuth';
 
-export async function GET() {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const GET = withAuth(async (
+  _req,
+  _,
+  supabase,
+  user
+) => {
   const { data, error } = await supabase
     .from('provider_configs')
     .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: true });
 
   if (error) {
@@ -28,23 +23,22 @@ export async function GET() {
     );
   }
 
-  const providers = data.map((p) => serializeProviderConfig(p, maskApiKey(decrypt(p.api_key))));
+  const providers = data.map((p) => {
+    let masked = '';
+    try { masked = maskApiKey(decrypt(p.api_key)); } catch { masked = '[INVALID]'; }
+    return serializeProviderConfig(p, masked);
+  });
 
   return NextResponse.json({ success: true, data: { providers } });
-}
+});
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  await ensureProfile(supabase, userData.user);
+export const POST = withAuth(async (
+  req,
+  _,
+  supabase,
+  user
+) => {
+  await ensureProfile(supabase, user);
 
   const { provider_name, api_key, model_name, base_url } = await req.json();
 
@@ -66,7 +60,7 @@ export async function POST(req: Request) {
   const { data: existing } = await supabase
     .from('provider_configs')
     .select('id')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .eq('provider_name', provider_name)
     .eq('model_name', model_name)
     .maybeSingle();
@@ -97,7 +91,7 @@ export async function POST(req: Request) {
   const { data, error } = await supabase
     .from('provider_configs')
     .insert({
-      user_id: userData.user.id,
+      user_id: user.id,
       provider_name,
       api_key: encryptedKey,
       base_url: base_url || null,
@@ -114,20 +108,15 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ success: true, data: { provider: serializeProviderConfig(data, maskApiKey(api_key)) } }, { status: 201 });
-}
+});
 
-export async function PUT(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  await ensureProfile(supabase, userData.user);
+export const PUT = withAuth(async (
+  req,
+  _,
+  supabase,
+  user
+) => {
+  await ensureProfile(supabase, user);
 
   const { provider_name, api_key, model_name, base_url } = await req.json();
 
@@ -153,7 +142,7 @@ export async function PUT(req: Request) {
   const { data, error } = await supabase
     .from('provider_configs')
     .update({ ...updateData, updated_at: new Date().toISOString() })
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .eq('provider_name', provider_name)
     .eq('model_name', model_name)
     .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
@@ -167,4 +156,5 @@ export async function PUT(req: Request) {
   }
 
   return NextResponse.json({ success: true, data: { provider: serializeProviderConfig(data, maskApiKey(decrypt(data.api_key))) } });
-}
+});
+

@@ -7,6 +7,8 @@ import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildN8nPrompt } from '@/lib/utils/n8nPrompt';
 import { validateN8nWorkflow } from '@/lib/utils/n8nValidator';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
+import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
+import { rateLimitResponse } from '@/lib/utils/rateLimit';
 
 function extractJson(text: string): string | null {
   const start = text.indexOf('{');
@@ -109,6 +111,9 @@ export async function POST(req: Request) {
     );
   }
 
+  const limited = rateLimitResponse(`${userData.user.id}:generate`, 6, 10 * 60_000);
+  if (limited) return limited;
+
   const { session_id } = await req.json();
 
   if (!session_id) {
@@ -160,12 +165,21 @@ export async function POST(req: Request) {
 
   const decryptedKey = providerConfig?.api_key ? decrypt(providerConfig.api_key) : '';
 
+  const providerName = providerConfig?.provider_name || 'gemini';
+  const modelName = providerConfig?.model_name || 'gemini-2.5-flash';
+  const capabilities = detectModelCapabilities(providerName, modelName);
+
   const aiConfig: AIProviderConfig = {
-    providerName: providerConfig?.provider_name || 'gemini',
+    providerName,
     apiKey: decryptedKey || '',
-    modelName: providerConfig?.model_name || 'gemini-2.5-flash',
+    modelName,
     baseUrl: providerConfig?.base_url || undefined,
-    maxTokens: 32000,
+    maxTokens: capabilities.maxTokens,
+    contextLevel: capabilities.contextLevel,
+    timeoutMs: capabilities.timeoutMs,
+    retryCount: capabilities.retryCount,
+    previewLimit: capabilities.previewLimit,
+    consistencyMode: capabilities.consistencyMode,
   };
 
   if (!aiConfig.apiKey) {

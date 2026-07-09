@@ -1,23 +1,18 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { ensureProfile } from '@/lib/db/ensureProfile';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { withAuth } from '@/lib/utils/apiAuth';
 
-export async function GET() {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const GET = withAuth(async (
+  _req,
+  _,
+  supabase,
+  user
+) => {
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -38,20 +33,15 @@ export async function GET() {
   }));
 
   return NextResponse.json({ success: true, data: { sessions } });
-}
+});
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  await ensureProfile(supabase, userData.user);
+export const POST = withAuth(async (
+  req,
+  _,
+  supabase,
+  user
+) => {
+  await ensureProfile(supabase, user);
 
   const { title, mode } = await req.json();
 
@@ -66,7 +56,7 @@ export async function POST(req: Request) {
 
   const { data, error } = await supabase
     .from('sessions')
-    .insert({ user_id: userData.user.id, title, mode: safeMode })
+    .insert({ user_id: user.id, title, mode: safeMode })
     .select()
     .single();
 
@@ -78,20 +68,14 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ success: true, data: { session: data } }, { status: 201 });
-}
+});
 
-export async function PATCH(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  // Verifikasi auth dulu
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const PATCH = withAuth(async (
+  req,
+  _,
+  _supabase,
+  user
+) => {
   const { session_id, title } = await req.json();
 
   if (!session_id || !title) {
@@ -114,7 +98,7 @@ export async function PATCH(req: Request) {
     .from('sessions')
     .update({ title, updated_at: new Date().toISOString() })
     .eq('id', session_id)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .select('id, title');
 
   if (error) {
@@ -132,4 +116,5 @@ export async function PATCH(req: Request) {
   }
 
   return NextResponse.json({ success: true, data: { session: updated[0] } });
-}
+});
+

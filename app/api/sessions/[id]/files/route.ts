@@ -48,7 +48,7 @@ export async function GET(
     const raw = session.generated_files as Record<string, unknown>;
     const { _progress, ...rest } = raw;
     cleanFiles = rest;
-    genProgressMeta = (_progress as Record<string, unknown>) || null;
+    genProgressMeta = (session.generation_progress as Record<string, unknown>) || (_progress as Record<string, unknown>) || null;
   }
 
   if (!hasDocs && !hasN8n) {
@@ -136,6 +136,9 @@ export async function DELETE(
     .from('sessions')
     .update({
       generated_files: null,
+      generation_progress: null,
+      generation_status: null,
+      generation_error: null,
       generated_at: null,
       n8n_workflow: null,
       n8n_template_name: null,

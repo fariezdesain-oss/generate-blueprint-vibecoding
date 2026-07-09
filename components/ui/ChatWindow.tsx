@@ -5,7 +5,7 @@ import { useChatStore } from '@/store/useChatStore';
 import { MessageBubble } from './MessageBubble';
 import { Sparkles } from 'lucide-react';
 
-export const ChatWindow = memo(function ChatWindow() {
+export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadingMessages?: boolean }) {
   const messages = useChatStore((s) => s.messages);
   const isGenerating = useChatStore((s) => s.isGenerating);
   const streamingContent = useChatStore((s) => s.streamingContent);
@@ -25,14 +25,28 @@ export const ChatWindow = memo(function ChatWindow() {
   if (messages.length === 0 && !isGenerating) {
     return (
       <div className="flex flex-1 items-center justify-center">
-          <div className="flex flex-col items-center gap-3 sm:gap-4 animate-float">
-          <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/10 to-gemini-blue/10 ring-1 ring-[var(--border)]">
-            <Sparkles className="size-6 sm:size-8 text-gemini-blue" />
-          </div>
-          <div className="text-center">
-            <h2 className="text-gradient text-sm sm:text-base lg:text-lg font-semibold">Mulai Percakapan</h2>
-            <p className="mt-1 text-xs sm:text-sm text-tertiary">Tanyakan sesuatu untuk memulai</p>
-          </div>
+        <div className="flex flex-col items-center gap-3 sm:gap-4 animate-float">
+          {loadingMessages ? (
+            <>
+              <div className="size-10 sm:size-12 lg:size-16 rounded-2xl bg-tertiary flex items-center justify-center">
+                <div className="size-4 rounded-full border-2 border-white/20 border-t-gemini-blue animate-spin" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-gradient text-sm sm:text-base lg:text-lg font-semibold">Memuat Percakapan</h2>
+                <p className="mt-1 text-xs sm:text-sm text-tertiary">Sabar sebentar...</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/10 to-gemini-blue/10 ring-1 ring-[var(--border)]">
+                <Sparkles className="size-6 sm:size-8 text-gemini-blue" />
+              </div>
+              <div className="text-center">
+                <h2 className="text-gradient text-sm sm:text-base lg:text-lg font-semibold">Mulai Percakapan</h2>
+                <p className="mt-1 text-xs sm:text-sm text-tertiary">Tanyakan sesuatu untuk memulai</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );

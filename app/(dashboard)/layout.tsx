@@ -9,6 +9,7 @@ import { ProviderBadge } from '@/components/ui/ProviderBadge';
 import { SessionManager } from '@/components/ui/SessionManager';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { Providers } from '@/app/providers';
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground';
 
 export default async function DashboardLayout({
   children,
@@ -26,6 +27,7 @@ export default async function DashboardLayout({
     <Providers>
     <SessionManager>
       <div className="relative flex h-screen flex-col overflow-hidden md:flex-row">
+        <AnimatedBackground />
         <MobileNav />
 
         <aside className="relative hidden w-72 shrink-0 flex-col overflow-y-auto border-r border-subtle bg-secondary p-5 md:flex">

@@ -17,16 +17,21 @@ export default function UpdatePasswordPage() {
   const supabase = createClient();
 
   useEffect(() => {
+    let poll: ReturnType<typeof setInterval>;
+    let timeout: ReturnType<typeof setTimeout>;
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'PASSWORD_RECOVERY') && session) {
         readyRef.current = true;
         setReady(true);
+        clearInterval(poll);
+        clearTimeout(timeout);
       }
     });
 
-    const poll = setInterval(async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
+    poll = setInterval(async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
         readyRef.current = true;
         setReady(true);
         clearInterval(poll);
@@ -34,7 +39,7 @@ export default function UpdatePasswordPage() {
       }
     }, 500);
 
-    const timeout = setTimeout(() => {
+    timeout = setTimeout(() => {
       clearInterval(poll);
       if (!readyRef.current) {
         setError('Link reset tidak valid atau sudah kedaluwarsa. Silakan coba reset password lagi.');

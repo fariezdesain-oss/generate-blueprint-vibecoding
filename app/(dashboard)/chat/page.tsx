@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useChatStore } from '@/store/useChatStore';
 import { ChatWindow } from '@/components/ui/ChatWindow';
-import { GeminiLoader } from '@/components/ui/GeminiLoader';
 import { Send, FileText, Square } from 'lucide-react';
 import { FILE_ORDER, FILE_LABELS, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 import { FilePicker } from '@/components/ui/FilePicker';
@@ -12,7 +11,8 @@ import type { Attachment } from '@/types/chat';
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [initializing, setInitializing] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genProgress, setGenProgress] = useState({
     current: 0,
@@ -96,91 +96,106 @@ export default function ChatPage() {
   useEffect(() => {
     if (!sessionId && !sessionIdUrlParam) {
       setShowModePicker(true);
-      setLoading(false);
+      setInitializing(false);
+      return;
     }
-  }, [sessionId, sessionIdUrlParam]);
 
-  useEffect(() => {
-    const init = async () => {
-      if (sessionIdUrlParam) {
-        setLoading(true);
-        try {
-          const check = await fetch(`/api/chat?session_id=${sessionIdUrlParam}`);
-          if (!check.ok) {
+    if (sessionIdUrlParam) {
+      setInitializing(false);
+      setLoadingMessages(true);
+      fetch(`/api/chat?session_id=${sessionIdUrlParam}`)
+        .then((r) => {
+          if (!r.ok) {
             sessionStorage.removeItem('activeSessionId');
             useChatStore.getState().reset();
             router.replace('/chat');
-            return;
+            return null;
           }
-          const json = await check.json();
-          if (json.success && json.data) {
-            setMode(json.data.mode || 'docs');
-            setShowModePicker(false);
-            setSessionId(sessionIdUrlParam);
-            sessionStorage.setItem('activeSessionId', sessionIdUrlParam);
-            return;
+          return r.json();
+        })
+        .then((json) => {
+          if (!json?.success || !json?.data) return;
+          if (useChatStore.getState().sessionId !== sessionIdUrlParam) {
+            useChatStore.getState().reset();
           }
-        } catch {
+          if (json.data.mode) setMode(json.data.mode || 'docs');
+          setShowModePicker(false);
+          setSessionId(sessionIdUrlParam);
+          sessionStorage.setItem('activeSessionId', sessionIdUrlParam);
+          if (json.data.messages?.length > 0) {
+            const mapped = json.data.messages.map((m: { id: string; session_id: string; role: string; content: string; created_at: string }) => ({
+              id: m.id,
+              sessionId: m.session_id,
+              role: m.role,
+              content: m.content,
+              createdAt: m.created_at,
+            }));
+            setMessages(mapped);
+          }
+          if (json.data.title) setSessionTitle(json.data.title);
+          const hasSignal = json.data.messages?.some(
+            (m: { role: string; content: string }) =>
+              m.role === 'assistant' && hasReadinessSignal(m.content)
+          );
+          setCanGenerate(!!hasSignal);
+        })
+        .catch(() => {
           sessionStorage.removeItem('activeSessionId');
           useChatStore.getState().reset();
           router.replace('/chat');
-          return;
-        }
-        setLoading(false);
-        return;
-      }
+        })
+        .finally(() => setLoadingMessages(false));
+      return;
+    }
 
-      if (useChatStore.getState().sessionId) {
-        useChatStore.getState().reset();
-      }
+    if (!sessionId && useChatStore.getState().sessionId) {
+      useChatStore.getState().reset();
+    }
 
-      const savedSessionId =
-        typeof window !== 'undefined' &&
-        sessionStorage.getItem('activeSessionId');
-      if (savedSessionId) {
-        router.replace(`/chat?id=${savedSessionId}`);
-        return;
-      }
+    const savedSessionId =
+      typeof window !== 'undefined' &&
+      sessionStorage.getItem('activeSessionId');
+    if (savedSessionId) {
+      router.replace(`/chat?id=${savedSessionId}`);
+      return;
+    }
 
-      setShowModePicker(true);
-      setLoading(false);
-    };
-
-    init();
+    setShowModePicker(true);
+    setInitializing(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionIdUrlParam]);
 
   const handleModePick = async (pickedMode: 'docs' | 'n8n') => {
     if (pickingMode) return;
     setPickingMode(true);
+    setMode(pickedMode);
     setShowModePicker(false);
 
-    try {
-      setMode(pickedMode);
-      const res = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'New Chat', mode: pickedMode }),
-      });
-      const json = await res.json();
-      if (json.success) {
+    fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'New Chat', mode: pickedMode }),
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
           setSessionId(json.data.session.id);
           setSessionTitle('New Chat');
           sessionStorage.setItem('activeSessionId', json.data.session.id);
           useChatStore.getState().bumpSidebar();
-      }
-    } catch {
-      setShowModePicker(true);
-    } finally {
-      setPickingMode(false);
-    }
+        } else {
+          setShowModePicker(true);
+        }
+      })
+      .catch(() => setShowModePicker(true))
+      .finally(() => setPickingMode(false));
   };
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || loadingMessages) return;
     titleSet.current = false;
     activeSessionRef.current = sessionId;
-    setLoading(true);
+    setLoadingMessages(true);
 
     const targetId = sessionId;
     const abort = new AbortController();
@@ -194,17 +209,14 @@ export default function ChatPage() {
           if (activeSessionRef.current === targetId) {
             sessionStorage.removeItem('activeSessionId');
             setSessionId(null);
-            setLoading(false);
             router.replace('/chat');
           }
           return;
         }
         const json = await res.json();
         if (json.success && activeSessionRef.current === targetId) {
-          if (json.data.mode) {
-            setMode(json.data.mode);
-          }
-          if (json.data.messages && json.data.messages.length > 0) {
+          if (json.data.mode) setMode(json.data.mode);
+          if (json.data.messages?.length > 0) {
             const mapped = json.data.messages.map((m: { id: string; session_id: string; role: string; content: string; created_at: string }) => ({
               id: m.id,
               sessionId: m.session_id,
@@ -216,18 +228,19 @@ export default function ChatPage() {
           }
           if (json.data.title && !titleSet.current) {
             setSessionTitle(json.data.title);
-            if (json.data.title !== 'New Chat') {
-              titleSet.current = true;
-            }
+            if (json.data.title !== 'New Chat') titleSet.current = true;
           }
-          const hasSignal = json.data.messages?.some((m: { role: string; content: string }) => m.role === 'assistant' && hasReadinessSignal(m.content));
+          const hasSignal = json.data.messages?.some(
+            (m: { role: string; content: string }) =>
+              m.role === 'assistant' && hasReadinessSignal(m.content)
+          );
           setCanGenerate(!!hasSignal);
         }
       } catch {
         // silently ignore aborted requests
       } finally {
         if (activeSessionRef.current === targetId) {
-          setLoading(false);
+          setLoadingMessages(false);
         }
       }
     };
@@ -241,7 +254,7 @@ export default function ChatPage() {
   const lastMessageRef = useRef<{ content: string; time: number } | null>(null);
 
   const sendMessage = async () => {
-    if (loading || sendingRef.current || isGenerating) return;
+    if (loadingMessages || sendingRef.current || isGenerating) return;
     const content = input.trim();
     const hasFiles = pendingFiles.length > 0;
     if (!content && !hasFiles) return;
@@ -413,9 +426,9 @@ export default function ChatPage() {
     const poll = async () => {
       if (!pollingActiveRef.current) return;
 
-      if (Date.now() - pollStartRef.current > 900000) {
+      if (Date.now() - pollStartRef.current > 3600000) {
         stopPolling();
-        setChatError('Generate melebihi batas waktu 15 menit. Silakan coba lagi.');
+        setChatError('Generate melebihi batas waktu 60 menit. Silakan coba lagi.');
         return;
       }
 
@@ -431,6 +444,7 @@ export default function ChatPage() {
           }
         } else {
           const files = json.data.files;
+          const fileCount = files ? countGeneratedSpecFiles(files) : 0;
           const genProgressMeta = json.data.generation_progress;
           if (genProgressMeta) {
             const { currentFileIndex, currentFileName, currentFileProgress, overallProgress, stage, message } = genProgressMeta;
@@ -462,7 +476,7 @@ export default function ChatPage() {
             }));
           }
 
-          if (json.data.generation_status === 'completed' || genProgressMeta?.stage === 'done') {
+          if ((json.data.generation_status === 'completed' || genProgressMeta?.stage === 'done') && fileCount >= FILE_ORDER.length) {
             stopPolling();
             router.push(`/generate/results?session_id=${sessionId}`);
           }
@@ -524,23 +538,29 @@ export default function ChatPage() {
     // Mulai polling dulu sebelum POST agar progress bar real-time
     pollForResults(mode);
 
-    // Fire-and-forget: POST tidak di-await
-    fetch('/api/generate/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, mode }),
-    })
-      .then(res => res.json())
-      .then(json => {
+    const runNext = async () => {
+      try {
+        const res = await fetch('/api/generate/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId, mode }),
+        });
+        const json = await res.json();
         if (!json.success) {
           stopPolling();
           setChatError(json?.error?.message || 'Gagal memulai generate. Silakan coba lagi.');
+          return;
         }
-      })
-      .catch(() => {
+        if (!json.data?.completed && pollingActiveRef.current) {
+          setTimeout(runNext, 500);
+        }
+      } catch {
         stopPolling();
         setChatError('Gagal terhubung ke server. Silakan coba lagi.');
-      });
+      }
+    };
+
+    runNext();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -551,21 +571,7 @@ export default function ChatPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <GeminiLoader />
-      </div>
-    );
-  }
-
-  if (sessionIdUrlParam && !sessionId) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <GeminiLoader />
-      </div>
-    );
-  }
+  if (initializing) return null;
 
   if (showModePicker) {
     return (
@@ -587,7 +593,7 @@ export default function ChatPage() {
               <div>
                 <h2 className="text-sm sm:text-base lg:text-lg font-bold text-primary">Dokumen Instruksi Vibecoding</h2>
                 <p className="mt-2 text-xs font-semibold text-tertiary leading-relaxed">
-                  Generate 7 dokumen engineering standar (PRD, Architecture, Data, Standards, dll.)
+                  Generate 9 dokumen engineering standar plus Tasks dan AI Rules
                   berdasarkan diskusi proyek dengan AI.
                 </p>
               </div>
@@ -742,7 +748,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      <ChatWindow />
+      <ChatWindow loadingMessages={loadingMessages} />
 
       <div className="border-t border-subtle p-3 sm:p-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:gap-4">

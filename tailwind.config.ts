@@ -36,9 +36,6 @@ const config: Config = {
         'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
         'shimmer': 'shimmer 2s linear infinite',
         'orb-1': 'orb-1 25s ease-in-out infinite',
-        'orb-2': 'orb-2 30s ease-in-out infinite',
-        'orb-3': 'orb-3 35s ease-in-out infinite',
-        'orb-4': 'orb-4 28s ease-in-out infinite',
         'fade-in-up': 'fade-in-up 0.6s ease-out forwards',
         'fade-in': 'fade-in 0.5s ease-out forwards',
         'slide-in-right': 'slide-in-right 0.3s ease-out',
@@ -82,22 +79,6 @@ const config: Config = {
           '25%': { transform: 'translate(20px, -30px) scale(1.1)' },
           '50%': { transform: 'translate(-10px, 20px) scale(0.9)' },
           '75%': { transform: 'translate(30px, 10px) scale(1.05)' },
-        },
-        'orb-2': {
-          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-          '25%': { transform: 'translate(-25px, 15px) scale(0.95)' },
-          '50%': { transform: 'translate(15px, -25px) scale(1.1)' },
-          '75%': { transform: 'translate(-10px, -5px) scale(1)' },
-        },
-        'orb-3': {
-          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-          '33%': { transform: 'translate(20px, 20px) scale(1.05)' },
-          '66%': { transform: 'translate(-20px, -10px) scale(0.95)' },
-        },
-        'orb-4': {
-          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-          '33%': { transform: 'translate(-15px, -20px) scale(1.1)' },
-          '66%': { transform: 'translate(15px, 15px) scale(0.9)' },
         },
         'fade-in-up': {
           '0%': { opacity: '0', transform: 'translateY(20px)' },

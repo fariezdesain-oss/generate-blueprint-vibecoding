@@ -1,40 +1,20 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { encrypt, decrypt } from '@/lib/utils/encryption';
 import { maskApiKey, serializeProviderConfig } from '@/lib/utils/providerConfig';
+import { withAuth, checkOwnership } from '@/lib/utils/apiAuth';
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
+export const DELETE = withAuth(async (
+  _req,
+  { params },
+  supabase,
+  user
+) => {
+  const { notFound, forbidden } = await checkOwnership(supabase, user, 'provider_configs', params.id);
+  if (notFound) {
+    return NextResponse.json({ success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } }, { status: 404 });
   }
-
-  const { data: config } = await supabase
-    .from('provider_configs')
-    .select('user_id')
-    .eq('id', params.id)
-    .single();
-
-  if (!config) {
-    return NextResponse.json(
-      { success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } },
-      { status: 404 },
-    );
-  }
-
-  if (config.user_id !== userData.user.id) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
-      { status: 403 },
-    );
+  if (forbidden) {
+    return NextResponse.json({ success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } }, { status: 403 });
   }
 
   const { error } = await supabase
@@ -50,20 +30,20 @@ export async function DELETE(
   }
 
   return NextResponse.json({ success: true, data: { message: 'Provider config deleted' } });
-}
+});
 
-export async function PATCH(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
+export const PATCH = withAuth(async (
+  req,
+  { params },
+  supabase,
+  user
+) => {
+  const { notFound, forbidden } = await checkOwnership(supabase, user, 'provider_configs', params.id);
+  if (notFound) {
+    return NextResponse.json({ success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } }, { status: 404 });
+  }
+  if (forbidden) {
+    return NextResponse.json({ success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } }, { status: 403 });
   }
 
   const body = await req.json();
@@ -76,31 +56,11 @@ export async function PATCH(
     );
   }
 
-  const { data: config } = await supabase
-    .from('provider_configs')
-    .select('user_id')
-    .eq('id', params.id)
-    .single();
-
-  if (!config) {
-    return NextResponse.json(
-      { success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } },
-      { status: 404 },
-    );
-  }
-
-  if (config.user_id !== userData.user.id) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
-      { status: 403 },
-    );
-  }
-
   if (is_active) {
     await supabase
       .from('provider_configs')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('user_id', userData.user.id)
+      .eq('user_id', user.id)
       .neq('id', params.id);
   }
 
@@ -119,20 +79,20 @@ export async function PATCH(
   }
 
   return NextResponse.json({ success: true, data: { provider: data } });
-}
+});
 
-export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } },
-) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
+export const PUT = withAuth(async (
+  req,
+  { params },
+  supabase,
+  user
+) => {
+  const { notFound, forbidden } = await checkOwnership(supabase, user, 'provider_configs', params.id);
+  if (notFound) {
+    return NextResponse.json({ success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } }, { status: 404 });
+  }
+  if (forbidden) {
+    return NextResponse.json({ success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } }, { status: 403 });
   }
 
   const { model_name, base_url, api_key } = await req.json();
@@ -141,26 +101,6 @@ export async function PUT(
     return NextResponse.json(
       { success: false, error: { code: 'VALIDATION_ERROR', message: 'model_name is required' } },
       { status: 400 },
-    );
-  }
-
-  const { data: config } = await supabase
-    .from('provider_configs')
-    .select('user_id, provider_name')
-    .eq('id', params.id)
-    .single();
-
-  if (!config) {
-    return NextResponse.json(
-      { success: false, error: { code: 'PROVIDER_NOT_FOUND', message: 'Provider config not found' } },
-      { status: 404 },
-    );
-  }
-
-  if (config.user_id !== userData.user.id) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
-      { status: 403 },
     );
   }
 
@@ -178,7 +118,7 @@ export async function PUT(
     .from('provider_configs')
     .update(updateData)
     .eq('id', params.id)
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
     .single();
 
@@ -193,4 +133,4 @@ export async function PUT(
     success: true,
     data: { provider: serializeProviderConfig(data, maskApiKey(decrypt(data.api_key))) },
   });
-}
+});

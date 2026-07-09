@@ -8,7 +8,7 @@ const VERSION = 'v2';
 function getKey(): Buffer {
   const secret = process.env.ENCRYPTION_SECRET;
   if (!secret) throw new Error('ENCRYPTION_SECRET is not set');
-  return crypto.scryptSync(secret, 'salt', 32);
+  return crypto.scryptSync(secret, 'salt', 32); // ponytail: hardcoded salt — changing breaks existing encrypted keys (no migration path). Known limitation.
 }
 
 export function encrypt(text: string): string {

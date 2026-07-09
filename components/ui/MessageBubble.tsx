@@ -1,7 +1,13 @@
 import { memo, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/db/supabaseBrowserClient';
 import { FileIcon, ImageIcon } from 'lucide-react';
 import type { Message, Attachment } from '@/types/chat';
+
+const MarkdownRenderer = dynamic(
+  () => import('./MarkdownRenderer').then((m) => m.MarkdownRenderer),
+  { ssr: false }
+);
 
 function AttachmentPreview({ att }: { att: Attachment }) {
   const [url, setUrl] = useState<string | null>(att.url || null);
@@ -75,7 +81,13 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
       >
         <Attachments attachments={message.attachments || []} />
         {message.content && (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          isUser ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+          ) : (
+            <div className="text-sm leading-relaxed">
+              <MarkdownRenderer content={message.content} />
+            </div>
+          )
         )}
         <p className={`mt-1 text-right text-[10px] ${isUser ? 'text-secondary' : 'text-tertiary'}`}>
           {new Date(message.createdAt).toLocaleTimeString([], {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
+import { rateLimitResponse } from '@/lib/utils/rateLimit';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
@@ -22,6 +23,9 @@ export async function POST(req: Request) {
       { status: 401 },
     );
   }
+
+  const limited = rateLimitResponse(`${userData.user.id}:upload`, 30, 60_000);
+  if (limited) return limited;
 
   const formData = await req.formData();
   const file = formData.get('file') as File | null;

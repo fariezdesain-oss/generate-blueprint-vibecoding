@@ -6,6 +6,8 @@ export const FILE_ORDER: string[] = [
   '05_DESIGN_SYSTEM.md',
   '06_DELIVERY.md',
   '07_AGENT_CONTEXT.md',
+  '08_TASKS.md',
+  '09_AI_RULES.md',
 ];
 
 export const FILE_LABELS: Record<string, string> = {
@@ -16,6 +18,8 @@ export const FILE_LABELS: Record<string, string> = {
   '05_DESIGN_SYSTEM.md': 'Design System',
   '06_DELIVERY.md': 'Testing, Security & Delivery',
   '07_AGENT_CONTEXT.md': 'Root AI Context File',
+  '08_TASKS.md': 'Atomic Vibecoding Tasks',
+  '09_AI_RULES.md': 'AI Implementation Rules',
 };
 
 export function countGeneratedSpecFiles(files: Record<string, string> | null | undefined): number {
@@ -58,7 +62,7 @@ function formatOtherFiles(files: Record<string, string>, previewLimit: number = 
 const BASE_SYSTEM = `Anda adalah senior software architect dan technical writer. Output Anda harus presisi, terstruktur, dan lengkap. WAJIB GUNAKAN BAHASA INDONESIA.
 
 ATURAN KUALITAS:
-1. KONSISTENSI - 7 dokumen dalam satu proyek HARUS konsisten satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika ada konflik, ikuti 01_PRD.md.
+1. KONSISTENSI - 9 dokumen dalam satu proyek HARUS konsisten satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika ada konflik, ikuti 01_PRD.md.
 2. BATAS DOKUMEN - tulis hanya topik yang diminta pada dokumen saat ini. Jangan mencampur PRD, arsitektur, data model, standar proyek, design system, delivery, dan agent context.
 3. DILARANG placeholder - jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
@@ -79,13 +83,13 @@ export function buildConsistencyPrompt(files: Record<string, string>): string {
   const prdContent = files['01_PRD.md'];
   if (!prdContent) return '';
 
-  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI 7 dokumen spesifikasi proyek berikut.
+  let prompt = `Anda adalah senior QA document reviewer. Periksa KONSISTENSI 9 dokumen spesifikasi proyek berikut.
 
 01_PRD.md adalah ACUAN UTAMA yang HARUS diikuti oleh SEMUA dokumen lainnya.
 
 Tugas Anda:
 1. Baca 01_PRD.md sebagai acuan utama.
-2. Baca dokumen 02 sampai 07.
+2. Baca dokumen 02 sampai 09.
 3. Periksa kontradiksi, istilah tidak selaras, fitur hilang, tech stack tidak konsisten, dan boundary dokumen yang tercampur.
 4. Jika SEMUA konsisten, balas hanya dengan teks: SEMUA KONSISTEN
 5. Jika ada yang perlu diperbaiki, keluarkan ULANG hanya file yang bermasalah secara LENGKAP, diawali dengan "# NAMAFILE.md".
@@ -108,6 +112,7 @@ export function buildFilePrompt(
   messages: { role: string; content: string }[],
   previousFiles: Record<string, string>,
   previewLimit: number = 0,
+  contextLevel: 'low' | 'medium' | 'high' = 'high',
 ): string {
   const fileName = FILE_ORDER[fileIndex];
 
@@ -270,12 +275,53 @@ WAJIB berisi secara ringkas:
 - Current Task
 - Next Task
 - Do Not Do
+- Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
 
 ATURAN KHUSUS:
 - Jangan panjang.
 - Jangan menambah informasi baru yang tidak ada di dokumen 01 sampai 06.
 - Pindahkan konsep checklist VIBECODING_STEPS lama hanya sebagai Progress, Current Task, Next Task, dan Blocked jika relevan.
+- Tulis jelas bahwa implementasi wajib dimulai dari 08_TASKS.md dan mengikuti 09_AI_RULES.md.
 - Format harus mudah dipakai AI saat sesi baru.`;
+      break;
+
+    case '08_TASKS.md':
+      filePrompt = `Buat dokumen 08_TASKS.md. Dokumen ini adalah daftar task atomic untuk proses vibecoding, terutama agar aman dipakai model AI gratis, lambat, atau low-context.
+
+WAJIB berisi:
+- Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
+- Phase pembangunan linear dari setup sampai release
+- Task atomic dengan format tabel: ID, Phase, Goal, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
+- Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
+- Aturan berhenti jika blocker muncul
+- Cara melanjutkan setelah task selesai
+
+ATURAN KHUSUS:
+- Jangan membuat task terlalu besar.
+- Jangan menggabungkan banyak fitur dalam satu task.
+- Pastikan setiap task menunjuk dokumen acuan yang relevan dari 01 sampai 07.
+- Tulis task agar user bisa copy-paste satu task ke model AI gratis/9router.`;
+      break;
+
+    case '09_AI_RULES.md':
+      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context.
+
+WAJIB berisi:
+- Cara memulai sesi AI baru
+- Urutan file yang wajib dibaca sebelum coding
+- Aturan context hemat untuk low-context model
+- Aturan menjalankan task dari 08_TASKS.md
+- Larangan: jangan refactor liar, jangan hapus fitur, jangan ubah scope tanpa izin, jangan menebak env secret, jangan lanjut jika konteks kurang
+- Kewajiban: rencana singkat, edit kecil, test sesuai task, lapor file berubah, lapor blocker
+- Prompt template siap pakai untuk user copy ke AI lain
+- Recovery flow jika AI error, timeout, atau kehilangan konteks
+- Quality checklist sebelum task dianggap selesai
+
+ATURAN KHUSUS:
+- Fokus pada instruksi operasional untuk AI implementer.
+- Jangan mengulang PRD panjang.
+- Jangan menambah fitur baru di luar dokumen sebelumnya.
+- Buat aturan tegas tapi tetap praktis untuk model AI gratis/9router.`;
       break;
 
     default:
@@ -283,10 +329,14 @@ ATURAN KHUSUS:
   }
 
   const conversationSection = fileIndex === 0 ? `\nCONVERSATION:\n${conversation}` : '';
+  const contextModeInstruction = contextLevel === 'low'
+    ? '\nMODE LOW-CONTEXT:\n- Tulis padat, tetap lengkap secara operasional.\n- Prioritaskan poin penting, tabel, dan checklist.\n- Hindari pengulangan panjang dari dokumen referensi.\n- Jika detail perlu dipecah, buat struktur task kecil yang mudah dilanjutkan.'
+    : '';
 
   return `${BASE_SYSTEM}
 
 ${filePrompt}
+${contextModeInstruction}
 ${contextSection}
 
 OUTPUT FORMAT:

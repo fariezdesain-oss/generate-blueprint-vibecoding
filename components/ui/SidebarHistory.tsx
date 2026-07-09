@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { Plus, X, FileText, Loader2 } from 'lucide-react';
 import { useChatStore } from '@/store/useChatStore';
 
@@ -21,7 +21,6 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
   const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
   const sidebarVersion = useChatStore((s) => s.sidebarVersion);
   const sessionId = useChatStore((s) => s.sessionId);
   const resetChatStore = useChatStore((s) => s.reset);
@@ -42,7 +41,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
 
   useEffect(() => {
     fetchSessions();
-  }, [pathname, sidebarVersion]);
+  }, [sidebarVersion]);
 
   useEffect(() => {
     const interval = setInterval(fetchSessions, 30000);
