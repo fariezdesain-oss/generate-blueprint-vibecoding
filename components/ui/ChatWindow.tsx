@@ -9,16 +9,24 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
   const messages = useChatStore((s) => s.messages);
   const isGenerating = useChatStore((s) => s.isGenerating);
   const streamingContent = useChatStore((s) => s.streamingContent);
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const initialScrollDone = useRef(false);
+  const prevFirstMsgId = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!bottomRef.current) return;
-    if (!initialScrollDone.current && messages.length > 0) {
-      bottomRef.current.scrollIntoView();
+    const container = containerRef.current;
+    if (!container) return;
+
+    const firstMsgId = messages[0]?.id ?? null;
+    const isNewSession = firstMsgId !== prevFirstMsgId.current;
+
+    if (isNewSession || !initialScrollDone.current) {
+      container.scrollTop = container.scrollHeight;
       initialScrollDone.current = true;
+      prevFirstMsgId.current = firstMsgId;
     } else {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, streamingContent]);
 
@@ -55,7 +63,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
   }
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6">
+    <div ref={containerRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6">
       <div className="mx-auto max-w-3xl space-y-3">
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} />
