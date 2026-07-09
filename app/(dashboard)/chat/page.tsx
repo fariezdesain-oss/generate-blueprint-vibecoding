@@ -116,9 +116,6 @@ export default function ChatPage() {
         })
         .then((json) => {
           if (!json?.success || !json?.data) return;
-          if (useChatStore.getState().sessionId !== sessionIdUrlParam) {
-            useChatStore.getState().reset();
-          }
           if (json.data.mode) setMode(json.data.mode || 'docs');
           setShowModePicker(false);
           setSessionId(sessionIdUrlParam);
@@ -194,6 +191,8 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!sessionId || loadingMessages) return;
+    // Jika sessionId sama dengan URL param, biarkan effect pertama handle loading
+    if (sessionIdUrlParam && sessionId === sessionIdUrlParam) return;
     titleSet.current = false;
     activeSessionRef.current = sessionId;
     setLoadingMessages(true);
@@ -249,7 +248,7 @@ export default function ChatPage() {
     load();
     return () => abort.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, sessionIdUrlParam, loadingMessages]);
 
   const sendingRef = useRef(false);
   const lastMessageRef = useRef<{ content: string; time: number } | null>(null);
