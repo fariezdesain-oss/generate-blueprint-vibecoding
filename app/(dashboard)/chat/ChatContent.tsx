@@ -91,6 +91,7 @@ export function ChatContent() {
   };
 
   const sessionIdUrlParam = searchParams.get('id');
+  const switchingSession = !!sessionIdUrlParam && sessionId !== sessionIdUrlParam;
 
   useEffect(() => {
     if (!sessionId && !sessionIdUrlParam) {
@@ -249,7 +250,7 @@ export function ChatContent() {
   const lastMessageRef = useRef<{ content: string; time: number } | null>(null);
 
   const sendMessage = async () => {
-    if (loadingMessages || sendingRef.current || isGenerating) return;
+    if (loadingMessages || switchingSession || sendingRef.current || isGenerating) return;
     const content = input.trim();
     const hasFiles = pendingFiles.length > 0;
     if (!content && !hasFiles) return;
@@ -740,11 +741,11 @@ export function ChatContent() {
         </div>
       )}
 
-      <ChatWindow loadingMessages={loadingMessages} />
+      <ChatWindow loadingMessages={loadingMessages || switchingSession} />
 
       <div className="border-t border-subtle p-3 sm:p-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:gap-4">
-          <FilePicker key={filePickerKey} sessionId={sessionId} onFilesReady={setPendingFiles} disabled={isGenerating} />
+          <FilePicker key={filePickerKey} sessionId={sessionId} onFilesReady={setPendingFiles} disabled={isGenerating || switchingSession} />
           <div className="flex gap-2 sm:gap-3">
             <div className="relative flex-1">
               <textarea
@@ -752,8 +753,8 @@ export function ChatContent() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                disabled={isGenerating}
-                placeholder={isGenerating ? "Tunggu hingga AI selesai merespon..." : "Ketik pesan..."}
+                disabled={isGenerating || switchingSession}
+                placeholder={isGenerating || switchingSession ? "Tunggu hingga sesi siap..." : "Ketik pesan..."}
                 className="w-full resize-none overflow-y-auto rounded-2xl bg-tertiary border border-subtle px-3 py-2.5 sm:px-4 sm:py-3 lg:px-6 lg:py-4 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary placeholder:font-medium focus:border-gemini-blue/30 focus:bg-tertiary focus:shadow-[0_0_20px_rgba(59,130,246,0.05)] disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{ maxHeight: '240px' }}
               />
