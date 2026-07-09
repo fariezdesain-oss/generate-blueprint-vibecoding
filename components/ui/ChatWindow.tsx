@@ -9,26 +9,30 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
   const messages = useChatStore((s) => s.messages);
   const isGenerating = useChatStore((s) => s.isGenerating);
   const streamingContent = useChatStore((s) => s.streamingContent);
+  const sessionId = useChatStore((s) => s.sessionId);
   const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const initialScrollDone = useRef(false);
-  const prevFirstMsgId = useRef<string | null>(null);
+  const justSwitchedRef = useRef(true);
+  const prevSessionId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (sessionId !== prevSessionId.current) {
+      prevSessionId.current = sessionId;
+      justSwitchedRef.current = true;
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const firstMsgId = messages[0]?.id ?? null;
-    const isNewSession = firstMsgId !== prevFirstMsgId.current;
-
-    if (isNewSession || !initialScrollDone.current) {
+    if (justSwitchedRef.current) {
       container.scrollTop = container.scrollHeight;
-      initialScrollDone.current = true;
-      prevFirstMsgId.current = firstMsgId;
-    } else {
+      if (messages.length > 0) justSwitchedRef.current = false;
+    } else if (isGenerating) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, streamingContent]);
+  }, [messages, streamingContent, isGenerating]);
 
   if (loadingMessages) {
     return (
