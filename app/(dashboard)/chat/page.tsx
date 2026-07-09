@@ -103,6 +103,7 @@ export default function ChatPage() {
     if (sessionIdUrlParam) {
       setInitializing(false);
       setLoadingMessages(true);
+      useChatStore.getState().reset();
       fetch(`/api/chat?session_id=${sessionIdUrlParam}`)
         .then((r) => {
           if (!r.ok) {
