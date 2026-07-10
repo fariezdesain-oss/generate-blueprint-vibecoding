@@ -58,6 +58,29 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!));
 }
 
+async function updateSessionWithRetry(
+  supabase: SupabaseClient,
+  sessionId: string,
+  userId: string,
+  updateData: Record<string, unknown>,
+): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await supabase
+      .from('sessions')
+      .update(updateData)
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    if (!error) return;
+    lastError = error;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to update session');
+}
+
 export async function retryAI(
   provider: AIProvider,
   prompt: string,
@@ -196,7 +219,7 @@ export async function processSequential(
       generated_files: existingFiles,
       updated_at: new Date().toISOString(),
     };
-    await supabase.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
+    await updateSessionWithRetry(supabase, sessionId, userId, updateData);
     generatedThisRun++;
     await new Promise(r => setTimeout(r, 300));
   }
@@ -237,9 +260,11 @@ export async function processSequential(
 
   const consistencyPrompt = aiConfig.consistencyMode === 'light' ? '' : buildConsistencyPrompt(existingFiles);
   if (consistencyPrompt) {
-    try {
-      const consistencyResponse = (await generateWithProviderFallback(candidates, () => consistencyPrompt, 2)).response;
-      if (!consistencyResponse.includes('SEMUA KONSISTEN')) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const consistencyResponse = (await generateWithProviderFallback(candidates, () => consistencyPrompt, 2)).response;
+        if (consistencyResponse.includes('SEMUA KONSISTEN')) break;
+
         const sections = consistencyResponse.split(/\n(?=# .+\.md)/);
         let repairedCount = 0;
         for (const section of sections) {
@@ -253,13 +278,14 @@ export async function processSequential(
             repairedCount++;
           }
         }
-        if (repairedCount === 0) {
-          throw new Error('Consistency check did not return valid document repairs');
+
+        if (repairedCount > 0) {
+          await updateSessionWithRetry(supabase, sessionId, userId, { generated_files: existingFiles, updated_at: new Date().toISOString() });
         }
-        await supabase.from('sessions').update({ generated_files: existingFiles, updated_at: new Date().toISOString() }).eq('id', sessionId).eq('user_id', userId);
+        break;
+      } catch {
+        if (attempt === 0) continue;
       }
-    } catch (err) {
-      throw err;
     }
   }
 
@@ -272,11 +298,7 @@ export async function processSequential(
     message: 'Selesai',
   });
 
-  await supabase
-    .from('sessions')
-    .update({ generated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', sessionId)
-    .eq('user_id', userId);
+  await updateSessionWithRetry(supabase, sessionId, userId, { generated_at: new Date().toISOString(), updated_at: new Date().toISOString() });
 
   return { completed: true, generatedCount: FILE_ORDER.length, totalFiles: FILE_ORDER.length, nextFile: '' };
 }

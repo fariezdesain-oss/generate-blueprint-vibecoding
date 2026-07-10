@@ -13,6 +13,23 @@ function countGeneratedSpecFiles(files) {
   return FILE_ORDER.filter(name => typeof files[name] === 'string' && files[name].trim().length > 0).length;
 }
 
+async function updateSessionWithRetry(supabase, sessionId, updateData) {
+  let lastError;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await supabase
+      .from('sessions')
+      .update(updateData)
+      .eq('id', sessionId);
+
+    if (!error) return;
+    lastError = error;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  throw lastError || new Error('Failed to update session');
+}
+
 function formatConversation(messages) {
   return messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
 }
@@ -43,7 +60,9 @@ ATURAN KUALITAS:
 2. BATAS DOKUMEN - tulis hanya topik yang diminta pada dokumen saat ini. Jangan mencampur PRD, arsitektur, data model, standar proyek, design system, delivery, dan agent context.
 3. DILARANG placeholder - jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
-5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".`;
+5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".
+6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md. Jika ada konflik, 01_PRD.md selalu menang.
+7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi.`;
 
 function buildConsistencyPrompt(files) {
   const prdContent = files ? files['01_PRD.md'] : null;
@@ -91,7 +110,7 @@ function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit, contex
 
   switch (fileName) {
     case '01_PRD.md':
-      filePrompt = `Buat dokumen 01_PRD.md. Dokumen ini HANYA membahas "apa yang dibangun".
+      filePrompt = `Buat dokumen 01_PRD.md. Dokumen ini HANYA membahas "apa yang dibangun". Dokumen ini adalah SINGLE SOURCE OF TRUTH untuk semua dokumen lain. Tulis seolah AI implementer hanya membaca PRD ini saat terjadi konflik; setiap fitur harus cukup jelas untuk diimplementasikan tanpa asumsi.
 
 WAJIB berisi:
 - Problem Statement
@@ -233,7 +252,10 @@ WAJIB berisi secara ringkas:
 - Current Task
 - Next Task
 - Do Not Do
+- URUTAN BACA WAJIB (BACA DULU SEBELUM APAPUN): 07_AGENT_CONTEXT.md → 01_PRD.md → 08_TASKS.md → 09_AI_RULES.md → dokumen teknis terkait task
+- File acuan per jenis task: 02_ARCHITECTURE.md untuk arsitektur, 03_DATA_MODELS.md untuk database, 04_PROJECT_STANDARDS.md untuk coding standard, 05_DESIGN_SYSTEM.md untuk UI/UX, 06_DELIVERY.md untuk testing/deploy
 - Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
+- Anti-halusinasi: DO NOT ASSUME ANYTHING NOT IN THESE DOCUMENTS; IF UNSURE, RE-READ 01_PRD.md FIRST
 
 ATURAN KHUSUS:
 - Jangan panjang.
@@ -249,7 +271,7 @@ ATURAN KHUSUS:
 WAJIB berisi:
 - Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
 - Phase pembangunan linear dari setup sampai release
-- Task atomic dengan format tabel: ID, Phase, Goal, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
+- Task atomic dengan format tabel: ID, Phase, Goal, Dokumen Wajib Dibaca, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
 - Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
 - Aturan berhenti jika blocker muncul
 - Cara melanjutkan setelah task selesai
@@ -257,23 +279,25 @@ WAJIB berisi:
 ATURAN KHUSUS:
 - Jangan membuat task terlalu besar.
 - Jangan menggabungkan banyak fitur dalam satu task.
-- Pastikan setiap task menunjuk dokumen acuan yang relevan dari 01 sampai 07.
+- Pastikan setiap task menunjuk Dokumen Wajib Dibaca secara eksplisit dari 01 sampai 09.
+- Setiap task harus bisa dikerjakan model low-context tanpa membaca semua dokumen; hanya baca file yang tercantum di kolom Dokumen Wajib Dibaca.
 - Tulis task agar user bisa copy-paste satu task ke model AI gratis/9router.`;
       break;
 
     case '09_AI_RULES.md':
-      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context.
+      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context. KHUSUS dokumen ini: tulis output dalam ENGLISH agar bisa dipahami model AI internasional.
 
-WAJIB berisi:
-- Cara memulai sesi AI baru
-- Urutan file yang wajib dibaca sebelum coding
-- Aturan context hemat untuk low-context model
-- Aturan menjalankan task dari 08_TASKS.md
-- Larangan: jangan refactor liar, jangan hapus fitur, jangan ubah scope tanpa izin, jangan menebak env secret, jangan lanjut jika konteks kurang
-- Kewajiban: rencana singkat, edit kecil, test sesuai task, lapor file berubah, lapor blocker
-- Prompt template siap pakai untuk user copy ke AI lain
-- Recovery flow jika AI error, timeout, atau kehilangan konteks
-- Quality checklist sebelum task dianggap selesai
+WAJIB berisi dalam English:
+- Session Start Protocol: read 07_AGENT_CONTEXT.md, then 01_PRD.md, then current task in 08_TASKS.md, then only referenced docs for that task
+- Required reading order before coding
+- Low-context model rules
+- How to execute tasks from 08_TASKS.md
+- Zero Hallucination Rules: never assume features outside 01_PRD.md, never use libraries outside 02_ARCHITECTURE.md, never create tables/fields outside 03_DATA_MODELS.md, stop and ask if context is missing
+- Anti-Drift Rules: never refactor unrelated code, never add scope, never guess env secrets, never continue with unclear context
+- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers
+- Ready-to-copy prompt template for another AI model
+- Recovery flow if AI errors, times out, loses context, or rate-limit happens
+- Quality checklist before a task is considered done
 
 ATURAN KHUSUS:
 - Fokus pada instruksi operasional untuk AI implementer.
@@ -447,14 +471,7 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
       generated_files: existingFiles,
       updated_at: new Date().toISOString(),
     };
-    const { error: updateError } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', sessionId);
-
-    if (updateError) {
-      throw new Error(`Failed to save ${fileName}: ${updateError.message}`);
-    }
+    await updateSessionWithRetry(supabase, sessionId, updateData);
 
     await new Promise(r => setTimeout(r, 1500));
 
@@ -474,10 +491,12 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
   const candidates = fallbackCandidates && fallbackCandidates.length ? fallbackCandidates : [{ id: 'primary', config, isPrimary: true }];
   const consistencyPrompt = config.consistencyMode === 'light' ? '' : buildConsistencyPrompt(existingFiles);
   if (consistencyPrompt) {
-    try {
-      const consistencyResult = await generateWithProviderFallback(candidates, () => consistencyPrompt, 2);
-      const consistencyResponse = consistencyResult.response;
-      if (!consistencyResponse.includes('SEMUA KONSISTEN')) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const consistencyResult = await generateWithProviderFallback(candidates, () => consistencyPrompt, 2);
+        const consistencyResponse = consistencyResult.response;
+        if (consistencyResponse.includes('SEMUA KONSISTEN')) break;
+
         const sections = consistencyResponse.split(/\n(?=# .+\.md)/);
         let repairedCount = 0;
         for (const section of sections) {
@@ -491,23 +510,18 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
             repairedCount++;
           }
         }
-        if (repairedCount === 0) {
-          throw new Error('Consistency check did not return valid document repairs');
+
+        if (repairedCount > 0) {
+          await updateSessionWithRetry(supabase, sessionId, { generated_files: existingFiles, updated_at: new Date().toISOString() });
         }
-        await supabase
-          .from('sessions')
-          .update({ generated_files: existingFiles, updated_at: new Date().toISOString() })
-          .eq('id', sessionId);
+        break;
+      } catch {
+        if (attempt === 0) continue;
       }
-    } catch (err) {
-      throw err;
     }
   }
 
-  await supabase
-    .from('sessions')
-    .update({ generated_at: new Date().toISOString() })
-    .eq('id', sessionId);
+  await updateSessionWithRetry(supabase, sessionId, { generated_at: new Date().toISOString() });
 }
 
 async function generateN8n(supabase, sessionId, messages, config) {

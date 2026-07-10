@@ -67,7 +67,7 @@ describe('sequentialPrompts', () => {
     });
 
     expect(prompt).toContain('09_AI_RULES.md');
-    expect(prompt).toContain('jangan refactor liar');
-    expect(prompt).toContain('Prompt template siap pakai');
+    expect(prompt).toContain('never refactor unrelated code');
+    expect(prompt).toContain('Ready-to-copy prompt template');
   });
 });

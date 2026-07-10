@@ -2,12 +2,36 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
-import { buildFilePrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
+import { buildFilePrompt, buildSingleFileConsistencyPrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { buildProviderFallbackCandidates } from '@/lib/utils/providerFallback';
 import { generateWithProviderFallback } from '@/lib/utils/generate';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+async function updateSessionWithRetry(
+  supabase: SupabaseClient,
+  sessionId: string,
+  userId: string,
+  updateData: Record<string, unknown>,
+): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const { error } = await supabase
+      .from('sessions')
+      .update(updateData)
+      .eq('id', sessionId)
+      .eq('user_id', userId);
+
+    if (!error) return;
+    lastError = error;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to update session');
+}
 
 export async function POST(req: Request) {
   const supabase = await createClient();
@@ -103,10 +127,14 @@ export async function POST(req: Request) {
   }
 
   try {
+    const fileName = FILE_ORDER[file_index];
+    const filesForContext = { ...existingFiles };
+    delete filesForContext[fileName];
+
     const buildPromptForConfig = (config: AIProviderConfig) => buildFilePrompt(
       file_index,
       messages,
-      existingFiles,
+      filesForContext,
       preview_limit ?? config.previewLimit ?? 0,
       config.contextLevel || 'high',
     );
@@ -130,7 +158,6 @@ export async function POST(req: Request) {
     let result = await generateWithProviderFallback(fallbackCandidates, buildPromptForConfig);
     let aiResponse = result.response;
 
-    const fileName = FILE_ORDER[file_index];
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
     const placeholderPatterns = [
@@ -149,6 +176,28 @@ export async function POST(req: Request) {
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
+    if (fileName !== '01_PRD.md' && aiConfig.consistencyMode !== 'light') {
+      const filesForCheck = { ...existingFiles, [fileName]: fileContent };
+      const consistencyPrompt = buildSingleFileConsistencyPrompt(fileName, fileContent, filesForCheck, aiConfig.previewLimit ?? 1200);
+
+      if (consistencyPrompt) {
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const consistency = await generateWithProviderFallback(fallbackCandidates, () => consistencyPrompt, 2);
+            const response = consistency.response.trim();
+            if (/^KONSISTEN$/i.test(response)) break;
+
+            if (response.includes(fileName)) {
+              fileContent = `# ${fileName}\n\n${response.replace(/^#\s*.*\n/, '').trim()}`;
+            }
+            break;
+          } catch {
+            if (attempt === 0) continue;
+          }
+        }
+      }
+    }
+
     const updatedFiles = { ...existingFiles, [fileName]: fileContent };
 
     const updateData: Record<string, unknown> = {
@@ -159,13 +208,9 @@ export async function POST(req: Request) {
       updateData.generated_at = new Date().toISOString();
     }
 
-    const { error: updateError } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', session_id)
-      .eq('user_id', userData.user.id);
-
-    if (updateError) {
+    try {
+      await updateSessionWithRetry(supabase, session_id, userData.user.id, updateData);
+    } catch {
       return NextResponse.json(
         { success: false, error: { code: 'DB_SAVE_FAILED', message: 'Gagal menyimpan dokumen. Silakan coba lagi.' } },
         { status: 500 },

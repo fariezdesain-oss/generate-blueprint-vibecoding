@@ -66,7 +66,9 @@ ATURAN KUALITAS:
 2. BATAS DOKUMEN - tulis hanya topik yang diminta pada dokumen saat ini. Jangan mencampur PRD, arsitektur, data model, standar proyek, design system, delivery, dan agent context.
 3. DILARANG placeholder - jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
-5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".`;
+5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".
+6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md. Jika ada konflik, 01_PRD.md selalu menang.
+7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi.`;
 
 function checkConversation(messages: { role: string; content: string }[]): boolean {
   const fullText = messages.map((m) => m.content).join(' ').toLowerCase();
@@ -107,6 +109,44 @@ ${prdContent}
   return prompt;
 }
 
+export function buildSingleFileConsistencyPrompt(
+  fileName: string,
+  fileContent: string,
+  files: Record<string, string>,
+  previewLimit: number = 1200,
+): string {
+  const prdContent = files['01_PRD.md'];
+  if (!prdContent || fileName === '01_PRD.md') return '';
+
+  const otherFiles = FILE_ORDER
+    .filter((name) => name !== fileName && name !== '01_PRD.md' && files[name])
+    .map((name) => {
+      const content = files[name];
+      const text = content.length > previewLimit
+        ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk consistency check]'
+        : content;
+      return `--- ${name} (REFERENSI KONSISTENSI) ---\n${text}`;
+    })
+    .join('\n\n');
+
+  return `Anda adalah senior QA document reviewer. Periksa apakah file ${fileName} konsisten dengan 01_PRD.md dan dokumen referensi lain.
+
+ATURAN:
+1. 01_PRD.md adalah source of truth utama.
+2. Jangan menambah fitur, teknologi, tabel, API, atau scope baru yang tidak ada di 01_PRD.md.
+3. Jangan mengubah topik utama file ${fileName}.
+4. Jika file sudah konsisten, balas hanya: KONSISTEN
+5. Jika perlu diperbaiki, keluarkan ulang HANYA isi lengkap file ${fileName}, diawali dengan "# ${fileName}".
+
+--- 01_PRD.md (SOURCE OF TRUTH) ---
+${prdContent}
+
+${otherFiles ? `${otherFiles}\n\n` : ''}--- ${fileName} (FILE HASIL REGENERATE) ---
+${fileContent}
+
+Balas "KONSISTEN" atau keluarkan ulang file ${fileName} yang sudah diperbaiki.`;
+}
+
 export function buildFilePrompt(
   fileIndex: number,
   messages: { role: string; content: string }[],
@@ -133,7 +173,7 @@ export function buildFilePrompt(
 
   switch (fileName) {
     case '01_PRD.md':
-      filePrompt = `Buat dokumen 01_PRD.md. Dokumen ini HANYA membahas "apa yang dibangun".
+      filePrompt = `Buat dokumen 01_PRD.md. Dokumen ini HANYA membahas "apa yang dibangun". Dokumen ini adalah SINGLE SOURCE OF TRUTH untuk semua dokumen lain. Tulis seolah AI implementer hanya membaca PRD ini saat terjadi konflik; setiap fitur harus cukup jelas untuk diimplementasikan tanpa asumsi.
 
 WAJIB berisi:
 - Problem Statement
@@ -275,7 +315,10 @@ WAJIB berisi secara ringkas:
 - Current Task
 - Next Task
 - Do Not Do
+- URUTAN BACA WAJIB (BACA DULU SEBELUM APAPUN): 07_AGENT_CONTEXT.md → 01_PRD.md → 08_TASKS.md → 09_AI_RULES.md → dokumen teknis terkait task
+- File acuan per jenis task: 02_ARCHITECTURE.md untuk arsitektur, 03_DATA_MODELS.md untuk database, 04_PROJECT_STANDARDS.md untuk coding standard, 05_DESIGN_SYSTEM.md untuk UI/UX, 06_DELIVERY.md untuk testing/deploy
 - Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
+- Anti-halusinasi: DO NOT ASSUME ANYTHING NOT IN THESE DOCUMENTS; IF UNSURE, RE-READ 01_PRD.md FIRST
 
 ATURAN KHUSUS:
 - Jangan panjang.
@@ -291,7 +334,7 @@ ATURAN KHUSUS:
 WAJIB berisi:
 - Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
 - Phase pembangunan linear dari setup sampai release
-- Task atomic dengan format tabel: ID, Phase, Goal, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
+- Task atomic dengan format tabel: ID, Phase, Goal, Dokumen Wajib Dibaca, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
 - Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
 - Aturan berhenti jika blocker muncul
 - Cara melanjutkan setelah task selesai
@@ -299,23 +342,25 @@ WAJIB berisi:
 ATURAN KHUSUS:
 - Jangan membuat task terlalu besar.
 - Jangan menggabungkan banyak fitur dalam satu task.
-- Pastikan setiap task menunjuk dokumen acuan yang relevan dari 01 sampai 07.
+- Pastikan setiap task menunjuk Dokumen Wajib Dibaca secara eksplisit dari 01 sampai 09.
+- Setiap task harus bisa dikerjakan model low-context tanpa membaca semua dokumen; hanya baca file yang tercantum di kolom Dokumen Wajib Dibaca.
 - Tulis task agar user bisa copy-paste satu task ke model AI gratis/9router.`;
       break;
 
     case '09_AI_RULES.md':
-      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context.
+      filePrompt = `Buat dokumen 09_AI_RULES.md. Dokumen ini adalah aturan kerja AI saat mengimplementasikan proyek agar tidak ngawur, terutama untuk model gratis, lambat, atau low-context. KHUSUS dokumen ini: tulis output dalam ENGLISH agar bisa dipahami model AI internasional.
 
-WAJIB berisi:
-- Cara memulai sesi AI baru
-- Urutan file yang wajib dibaca sebelum coding
-- Aturan context hemat untuk low-context model
-- Aturan menjalankan task dari 08_TASKS.md
-- Larangan: jangan refactor liar, jangan hapus fitur, jangan ubah scope tanpa izin, jangan menebak env secret, jangan lanjut jika konteks kurang
-- Kewajiban: rencana singkat, edit kecil, test sesuai task, lapor file berubah, lapor blocker
-- Prompt template siap pakai untuk user copy ke AI lain
-- Recovery flow jika AI error, timeout, atau kehilangan konteks
-- Quality checklist sebelum task dianggap selesai
+WAJIB berisi dalam English:
+- Session Start Protocol: read 07_AGENT_CONTEXT.md, then 01_PRD.md, then current task in 08_TASKS.md, then only referenced docs for that task
+- Required reading order before coding
+- Low-context model rules
+- How to execute tasks from 08_TASKS.md
+- Zero Hallucination Rules: never assume features outside 01_PRD.md, never use libraries outside 02_ARCHITECTURE.md, never create tables/fields outside 03_DATA_MODELS.md, stop and ask if context is missing
+- Anti-Drift Rules: never refactor unrelated code, never add scope, never guess env secrets, never continue with unclear context
+- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers
+- Ready-to-copy prompt template for another AI model
+- Recovery flow if AI errors, times out, loses context, or rate-limit happens
+- Quality checklist before a task is considered done
 
 ATURAN KHUSUS:
 - Fokus pada instruksi operasional untuk AI implementer.
