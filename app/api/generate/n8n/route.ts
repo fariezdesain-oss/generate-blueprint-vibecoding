@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
@@ -258,12 +257,6 @@ export async function POST(req: Request) {
       );
     }
 
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-
     const updateData: Record<string, unknown> = {
       n8n_workflow: parsed.workflow,
       n8n_generated_at: new Date().toISOString(),
@@ -274,7 +267,7 @@ export async function POST(req: Request) {
       updateData.n8n_setup_instructions = parsed.setupInstructions;
     }
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabase
       .from('sessions')
       .update(updateData)
       .eq('id', session_id)

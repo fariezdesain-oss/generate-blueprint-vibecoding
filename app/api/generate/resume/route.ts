@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
@@ -121,27 +120,21 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
-  try { await supabaseAdmin.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+  try { await supabase.from('sessions').update({ generation_status: 'generating', generation_error: null }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
 
   try {
     if (mode === 'n8n') {
-      await processN8nSync(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig);
+      await processN8nSync(supabase, sessionId, userData.user.id, messages, aiConfig);
     } else {
-      await processSequential(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig);
+      await processSequential(supabase, sessionId, userData.user.id, messages, aiConfig);
     }
 
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+    try { await supabase.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode, resumed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+    try { await supabase.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },

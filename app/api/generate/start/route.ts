@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
@@ -105,14 +104,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
   try {
-    await supabaseAdmin
+    await supabase
       .from('sessions')
       .update({ generation_status: 'generating', generation_error: null, updated_at: new Date().toISOString() })
       .eq('id', sessionId)
@@ -152,21 +145,21 @@ export async function POST(req: Request) {
   // Synchronous fallback (auto-used in dev, fallback in production)
   try {
     if (mode === 'n8n') {
-      await processN8nSync(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig);
+      await processN8nSync(supabase, sessionId, userData.user.id, messages, aiConfig);
     } else {
-      const fallbackCandidates = await loadProviderFallbackCandidates(supabaseAdmin, userData.user.id);
-      const result = await processSequential(supabaseAdmin, sessionId, userData.user.id, messages, aiConfig, fallbackCandidates, 1);
+      const fallbackCandidates = await loadProviderFallbackCandidates(supabase, userData.user.id);
+      const result = await processSequential(supabase, sessionId, userData.user.id, messages, aiConfig, fallbackCandidates, 1);
       const status = result.completed ? 'completed' : 'waiting_next';
-      try { await supabaseAdmin.from('sessions').update({ generation_status: status }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+      try { await supabase.from('sessions').update({ generation_status: status }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
       return NextResponse.json({ success: true, data: { jobId: sessionId, mode, ...result } });
     }
 
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+    try { await supabase.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode, completed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    try { await supabaseAdmin.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
+    try { await supabase.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', userData.user.id); } catch { /* kolom mungkin belum ada */ }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },

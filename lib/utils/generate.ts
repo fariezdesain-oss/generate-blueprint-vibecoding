@@ -1,5 +1,5 @@
 import { createProvider } from '@/lib/ai/provider.factory';
-import type { AIProviderConfig } from '@/lib/ai/provider.interface';
+import type { AIProvider, AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, FILE_ORDER, FILE_LABELS, buildConsistencyPrompt, countGeneratedSpecFiles } from '@/lib/utils/sequentialPrompts';
 import { buildN8nPrompt } from '@/lib/utils/n8nPrompt';
 import { validateN8nWorkflow } from '@/lib/utils/n8nValidator';
@@ -17,13 +17,13 @@ export interface GenerationProgress {
 }
 
 async function updateGenerationProgress(
-  supabaseAdmin: SupabaseClient,
+  supabase: SupabaseClient,
   sessionId: string,
   userId: string,
   progress: GenerationProgress,
 ) {
   try {
-    const { error } = await supabaseAdmin
+    const { error } = await supabase
       .from('sessions')
       .update({ generation_progress: progress, updated_at: new Date().toISOString() })
       .eq('id', sessionId)
@@ -32,7 +32,7 @@ async function updateGenerationProgress(
     if (!error) return;
 
     // ponytail: legacy fallback until all deployed DBs have generation_progress.
-    const { data: session } = await supabaseAdmin
+    const { data: session } = await supabase
       .from('sessions')
       .select('generated_files')
       .eq('id', sessionId)
@@ -40,7 +40,7 @@ async function updateGenerationProgress(
       .single();
     const files = (session?.generated_files as Record<string, unknown>) || {};
     files._progress = progress;
-    await supabaseAdmin
+    await supabase
       .from('sessions')
       .update({ generated_files: files, updated_at: new Date().toISOString() })
       .eq('id', sessionId)
@@ -59,7 +59,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
 }
 
 export async function retryAI(
-  provider: any,
+  provider: AIProvider,
   prompt: string,
   _config: AIProviderConfig,
   maxAttempts: number = _config.retryCount || 3,
@@ -110,7 +110,7 @@ export async function generateWithProviderFallback(
 }
 
 export async function processSequential(
-  supabaseAdmin: SupabaseClient,
+  supabase: SupabaseClient,
   sessionId: string,
   userId: string,
   messages: { role: string; content: string }[],
@@ -118,7 +118,7 @@ export async function processSequential(
   fallbackCandidates?: ProviderFallbackCandidate[],
   maxFiles: number = Number.POSITIVE_INFINITY,
 ): Promise<{ completed: boolean; generatedCount: number; totalFiles: number; nextFile: string }> {
-  const { data: session } = await supabaseAdmin
+  const { data: session } = await supabase
     .from('sessions')
     .select('generated_files')
     .eq('id', sessionId)
@@ -131,7 +131,7 @@ export async function processSequential(
     : [{ id: 'primary', config: aiConfig, isPrimary: true }];
 
   const pushProgress = async (i: number, fileName: string, progress: number, stage: GenerationProgress['stage'], message: string) => {
-    await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
+    await updateGenerationProgress(supabase, sessionId, userId, {
       currentFileIndex: i,
       currentFileName: fileName,
       currentFileProgress: progress,
@@ -177,7 +177,7 @@ export async function processSequential(
     }
 
     await pushProgress(i, fileName, 95, 'saving', `Menyimpan ${fileLabel}...`);
-    const { data: latestSession } = await supabaseAdmin
+    const { data: latestSession } = await supabase
       .from('sessions')
       .select('generated_files')
       .eq('id', sessionId)
@@ -196,7 +196,7 @@ export async function processSequential(
       generated_files: existingFiles,
       updated_at: new Date().toISOString(),
     };
-    await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
+    await supabase.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
     generatedThisRun++;
     await new Promise(r => setTimeout(r, 300));
   }
@@ -205,7 +205,7 @@ export async function processSequential(
   const nextFile = FILE_ORDER.find((name) => !existingFiles[name] || existingFiles[name].trim().length === 0) || '';
 
   if (generatedCount < FILE_ORDER.length) {
-    await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
+    await updateGenerationProgress(supabase, sessionId, userId, {
       currentFileIndex: Math.max(0, generatedCount - 1),
       currentFileName: nextFile,
       currentFileProgress: 0,
@@ -218,7 +218,7 @@ export async function processSequential(
   }
 
   // Final consistency check against PRD
-  await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
+  await updateGenerationProgress(supabase, sessionId, userId, {
     currentFileIndex: FILE_ORDER.length - 1,
     currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
     currentFileProgress: 100,
@@ -227,7 +227,7 @@ export async function processSequential(
     message: 'Final consistency check...',
   });
 
-  const { data: latestBeforeConsistency } = await supabaseAdmin
+  const { data: latestBeforeConsistency } = await supabase
     .from('sessions')
     .select('generated_files')
     .eq('id', sessionId)
@@ -256,14 +256,14 @@ export async function processSequential(
         if (repairedCount === 0) {
           throw new Error('Consistency check did not return valid document repairs');
         }
-        await supabaseAdmin.from('sessions').update({ generated_files: existingFiles, updated_at: new Date().toISOString() }).eq('id', sessionId).eq('user_id', userId);
+        await supabase.from('sessions').update({ generated_files: existingFiles, updated_at: new Date().toISOString() }).eq('id', sessionId).eq('user_id', userId);
       }
     } catch (err) {
       throw err;
     }
   }
 
-  await updateGenerationProgress(supabaseAdmin, sessionId, userId, {
+  await updateGenerationProgress(supabase, sessionId, userId, {
     currentFileIndex: FILE_ORDER.length - 1,
     currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
     currentFileProgress: 100,
@@ -272,7 +272,7 @@ export async function processSequential(
     message: 'Selesai',
   });
 
-  await supabaseAdmin
+  await supabase
     .from('sessions')
     .update({ generated_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq('id', sessionId)
@@ -359,7 +359,7 @@ function autoFixWorkflow(workflow: Record<string, unknown>): { workflow: Record<
 }
 
 export async function processN8nSync(
-  supabaseAdmin: SupabaseClient,
+  supabase: SupabaseClient,
   sessionId: string,
   userId: string,
   messages: { role: string; content: string }[],
@@ -424,5 +424,5 @@ export async function processN8nSync(
     updateData.n8n_setup_instructions = parsed.setupInstructions;
   }
 
-  await supabaseAdmin.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
+  await supabase.from('sessions').update(updateData).eq('id', sessionId).eq('user_id', userId);
 }

@@ -27,14 +27,16 @@ Arsitektur bersifat:
 
 ### 2.1 Frontend
 
-- Next.js 14.x
+- Next.js 14.x (App Router)
 - React 18.x
 - TypeScript 5.x
 - TailwindCSS 3.4.x
-- ShadCN UI
+- Radix UI primitives
 - Zustand (state management ringan)
 - React Hook Form
-- Zod (schema validation)
+- next-themes (dark mode)
+- react-markdown + remark-gfm + rehype-highlight
+- Mermaid (diagram rendering)
 
 Runtime:
 - Node.js 20.x
@@ -44,9 +46,12 @@ Runtime:
 ### 2.2 Backend (API Layer)
 
 - Next.js Route Handlers
-- Supabase JS SDK 2.x
-- Zod validation
-- Server-side AI provider abstraction
+- Supabase JS SDK 2.x (SSR cookie auth)
+- Supabase service role (server-only privileged ops)
+- Server-side AI provider abstraction (Gemini, OpenRouter, Groq, DeepSeek, OpenAI-compatible)
+- Encryption (AES-256-GCM untuk API keys)
+- Rate limiting (in-memory per-user)
+- Provider fallback chain
 
 ---
 
@@ -87,107 +92,106 @@ Semua provider mengikuti interface standar:
 ---
 
 ## 3. Struktur Folder Proyek
-/app
-/api
-/chat
-route.ts
-/generate
-route.ts
-/sessions
-route.ts
-/providers
-route.ts
-/(dashboard)
-/chat
-/history
-/settings
-layout.tsx
-page.tsx
 
-/components
-/ui
-ChatWindow.tsx
-MessageBubble.tsx
-SidebarHistory.tsx
-ProviderSelector.tsx
-StopButton.tsx
-
-/lib
-/ai
-provider.interface.ts
-provider.factory.ts
-gemini.provider.ts
-openrouter.provider.ts
-groq.provider.ts
-deepseek.provider.ts
-/db
-supabaseClient.ts
-/utils
-zipGenerator.ts
-markdownGenerator.ts
-
-/store
-useChatStore.ts
-useProviderStore.ts
-
-/types
-chat.ts
-session.ts
-provider.ts
-
-/styles
-globals.css
-
-/app
-/api
-/chat
-route.ts
-/generate
-route.ts
-/sessions
-route.ts
-/providers
-route.ts
-/(dashboard)
-/chat
-/history
-/settings
-layout.tsx
-page.tsx
-
-/components
-/ui
-ChatWindow.tsx
-MessageBubble.tsx
-SidebarHistory.tsx
-ProviderSelector.tsx
-StopButton.tsx
-
-/lib
-/ai
-provider.interface.ts
-provider.factory.ts
-gemini.provider.ts
-openrouter.provider.ts
-groq.provider.ts
-deepseek.provider.ts
-/db
-supabaseClient.ts
-/utils
-zipGenerator.ts
-markdownGenerator.ts
-
-/store
-useChatStore.ts
-useProviderStore.ts
-
-/types
-chat.ts
-session.ts
-provider.ts
-
-/styles
-globals.css
+```
+.
+├── app/
+│   ├── layout.tsx                  # Root layout
+│   ├── page.tsx                    # Home (redirect based on auth)
+│   ├── providers.tsx               # Client providers
+│   ├── globals.css                 # Global styles
+│   ├── middleware.ts               # Auth guard
+│   ├── (auth)/                     # Auth pages
+│   │   ├── login/page.tsx
+│   │   ├── register/page.tsx
+│   │   ├── forgot-password/page.tsx
+│   │   └── update-password/page.tsx
+│   ├── auth/callback/route.ts      # Supabase auth callback
+│   ├── (dashboard)/                # Protected pages
+│   │   ├── layout.tsx              # Dashboard shell (sidebar, nav)
+│   │   ├── chat/page.tsx
+│   │   ├── chat/ChatContent.tsx    # Main chat UI controller
+│   │   ├── history/page.tsx
+│   │   ├── settings/page.tsx
+│   │   └── generate/results/page.tsx
+│   └── api/                        # Route handlers
+│       ├── chat/route.ts
+│       ├── upload/route.ts
+│       ├── cleanup-files/route.ts
+│       ├── auth/logout/route.ts
+│       ├── sessions/route.ts
+│       ├── sessions/[id]/route.ts
+│       ├── sessions/[id]/files/route.ts
+│       ├── providers/route.ts
+│       ├── providers/[id]/route.ts
+│       ├── providers/test/route.ts
+│       └── generate/
+│           ├── start/route.ts
+│           ├── sequential/route.ts
+│           ├── resume/route.ts
+│           ├── n8n/route.ts
+│           └── download/route.ts
+├── components/ui/                  # React components
+│   ├── ChatWindow.tsx
+│   ├── MessageBubble.tsx
+│   ├── MarkdownRenderer.tsx
+│   ├── MermaidBlock.tsx
+│   ├── FilePicker.tsx
+│   ├── FilePreviewModal.tsx
+│   ├── SidebarHistory.tsx
+│   ├── MobileNav.tsx
+│   ├── ProviderSelector.tsx
+│   ├── ProviderBadge.tsx
+│   ├── SessionManager.tsx
+│   ├── SessionTimeoutModal.tsx
+│   ├── ThemeToggle.tsx
+│   ├── LogoutButton.tsx
+│   ├── GeminiLoader.tsx
+│   └── AnimatedBackground.tsx
+├── lib/
+│   ├── ai/                         # AI provider abstraction
+│   │   ├── provider.interface.ts
+│   │   ├── provider.factory.ts
+│   │   ├── gemini.provider.ts
+│   │   ├── openrouter.provider.ts
+│   │   ├── groq.provider.ts
+│   │   ├── deepseek.provider.ts
+│   │   └── custom.provider.ts
+│   ├── db/                         # Database clients
+│   │   ├── supabaseServerClient.ts
+│   │   ├── supabaseBrowserClient.ts
+│   │   └── ensureProfile.ts
+│   └── utils/                      # Utility functions
+│       ├── apiAuth.ts
+│       ├── aiErrorHandler.ts
+│       ├── attachments.ts
+│       ├── encryption.ts
+│       ├── generate.ts
+│       ├── modelCapabilities.ts
+│       ├── n8nPrompt.ts
+│       ├── n8nValidator.ts
+│       ├── providerConfig.ts
+│       ├── providerFallback.ts
+│       ├── rateLimit.ts
+│       ├── sequentialPrompts.ts
+│       └── zipGenerator.ts
+├── store/
+│   └── useChatStore.ts             # Zustand state
+├── types/
+│   └── chat.ts                     # Shared types
+├── hooks/
+│   └── useInactivityTimeout.ts
+├── supabase/migrations/            # DB schema & migrations
+├── netlify/
+│   ├── functions/generate-background.mjs
+│   └── shared/                     # Shared .mjs modules
+│       ├── constants.mjs
+│       ├── utils.mjs
+│       └── ai.mjs
+├── tests/                          # Unit & E2E tests
+├── docs/                           # Documentation
+└── public/
+```
 
 4.2 Generate Documentation Flow
 sequenceDiagram

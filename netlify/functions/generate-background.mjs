@@ -1,186 +1,16 @@
+// Netlify background function for long-running doc/n8n generation.
+// ponytail: orchestration only — shared logic lives in ../shared/.
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
-
-const FILE_ORDER = [
-  '01_PRD.md',
-  '02_ARCHITECTURE.md',
-  '03_DATA_MODELS.md',
-  '04_PROJECT_STANDARDS.md',
-  '05_DESIGN_SYSTEM.md',
-  '06_DELIVERY.md',
-  '07_AGENT_CONTEXT.md',
-  '08_TASKS.md',
-  '09_AI_RULES.md',
-];
-
-const ALGORITHM = 'aes-256-gcm';
-const LEGACY_ALGORITHM = 'aes-256-cbc';
-const IV_LENGTH = 16;
-const ENCRYPTION_VERSION = 'v2';
-
-function getKey() {
-  const secret = process.env.ENCRYPTION_SECRET;
-  if (!secret) throw new Error('ENCRYPTION_SECRET is not set');
-  return crypto.scryptSync(secret, 'salt', 32);
-}
-
-function decrypt(encryptedText) {
-  const key = getKey();
-  const parts = encryptedText.split(':');
-
-  if (parts[0] === ENCRYPTION_VERSION) {
-    const [, ivHex, authTagHex, encrypted] = parts;
-    if (!ivHex || !authTagHex || !encrypted) throw new Error('Invalid encrypted text');
-
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
-    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  }
-
-  const iv = Buffer.from(parts.shift(), 'hex');
-  const encrypted = parts.join(':');
-  const decipher = crypto.createDecipheriv(LEGACY_ALGORITHM, key, iv);
-  let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-  decrypted += decipher.final('utf8');
-  return decrypted;
-}
+import { FILE_ORDER } from '../shared/constants.mjs';
+import { extractJson, generateId, autoFixWorkflow, validateN8nWorkflow } from '../shared/utils.mjs';
+import {
+  decrypt, detectModelCapabilities, isFallbackableAIError,
+  buildAIConfig, buildProviderFallbackCandidates, callAI, generateWithProviderFallback,
+} from '../shared/ai.mjs';
 
 function countGeneratedSpecFiles(files) {
   if (!files) return 0;
   return FILE_ORDER.filter(name => typeof files[name] === 'string' && files[name].trim().length > 0).length;
-}
-
-function isFallbackableAIError(err) {
-  const message = err?.message || String(err || '');
-  return /timeout|quota|rate|429|500|502|503|504|service unavailable|overloaded|temporarily unavailable|payment required|insufficient.*credit|credit.*exhaust|resource exhausted|empty response|failed to generate/i.test(message);
-}
-
-function detectModelCapabilities(providerName, modelName) {
-  const provider = providerName.toLowerCase();
-  const model = modelName.toLowerCase();
-  const low = /free|8b|7b|(^|[-_/:])mini($|[-_/:])|(^|[-_/:])small($|[-_/:])|flash-lite|gemma|llama-3\.1-8b|llama-3\.2-3b/i.test(model);
-  const high = /gemini-1\.5-pro|gemini-1\.5-flash|gemini-2\.|claude-3\.?5|claude-3\.?7|claude-sonnet-4|gpt-4o|gpt-4\.1|o1|o3|128k|200k|1m/i.test(model) || provider === 'gemini';
-
-  if (low) return { contextLevel: 'low', maxTokens: 12000, previewLimit: 900, timeoutMs: provider === 'groq' ? 90000 : 150000, retryCount: 4, consistencyMode: 'light' };
-  if (high) return { contextLevel: 'high', maxTokens: 32000, previewLimit: 3000, timeoutMs: 240000, retryCount: 3, consistencyMode: 'full' };
-  return { contextLevel: 'medium', maxTokens: 20000, previewLimit: 1600, timeoutMs: 180000, retryCount: 3, consistencyMode: 'light' };
-}
-
-function buildAIConfig(row) {
-  const capabilities = detectModelCapabilities(row.provider_name || 'gemini', row.model_name || 'gemini-2.5-flash');
-  return {
-    providerName: row.provider_name || 'gemini',
-    apiKey: decrypt(row.api_key),
-    modelName: row.model_name || 'gemini-2.5-flash',
-    baseUrl: row.base_url || undefined,
-    maxTokens: capabilities.maxTokens,
-    contextLevel: capabilities.contextLevel,
-    timeoutMs: capabilities.timeoutMs,
-    retryCount: capabilities.retryCount,
-    previewLimit: capabilities.previewLimit,
-    consistencyMode: capabilities.consistencyMode,
-  };
-}
-
-function buildProviderFallbackCandidates(rows) {
-  const active = rows.filter(row => row.api_key && row.api_key.length > 0);
-  const primary = active.find(row => row.is_active) || active[0];
-  if (!primary) return [];
-  const scores = { high: 3, medium: 2, low: 1 };
-  const fallbackRows = active
-    .filter(row => row.id !== primary.id)
-    .sort((a, b) => {
-      const ac = detectModelCapabilities(a.provider_name, a.model_name);
-      const bc = detectModelCapabilities(b.provider_name, b.model_name);
-      const diff = scores[bc.contextLevel] - scores[ac.contextLevel];
-      if (diff !== 0) return diff;
-      return (a.created_at || '').localeCompare(b.created_at || '');
-    });
-  return [primary, ...fallbackRows].map(row => ({ id: row.id, config: buildAIConfig(row), isPrimary: row.id === primary.id })).filter(c => c.config.apiKey);
-}
-
-async function callAI(prompt, config) {
-  const isGemini = config.providerName === 'gemini';
-  const maxTokens = config.maxTokens || 32000;
-  let url, headers, body;
-
-  if (isGemini) {
-    const model = config.modelName || 'gemini-2.5-flash';
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
-    headers = { 'Content-Type': 'application/json' };
-    body = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: maxTokens },
-    });
-  } else {
-    const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
-    url = `${baseUrl}/chat/completions`;
-    headers = {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiKey}`,
-    };
-    body = JSON.stringify({
-      model: config.modelName,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: maxTokens,
-    });
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 600000);
-
-  try {
-    const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
-    clearTimeout(timeout);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(`AI API error (${res.status}): ${errText}`);
-    }
-
-    if (isGemini) {
-      const json = await res.json();
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!text.trim()) throw new Error('AI empty response');
-      return text;
-    } else {
-      const json = await res.json();
-      const text = json.choices?.[0]?.message?.content || '';
-      if (!text.trim()) throw new Error('AI empty response');
-      return text;
-    }
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
-  }
-}
-
-async function generateWithProviderFallback(candidates, buildPromptForConfig, maxAttemptsOverride) {
-  let lastError;
-  for (const candidate of candidates) {
-    const prompt = buildPromptForConfig(candidate.config);
-    const maxAttempts = maxAttemptsOverride || candidate.config.retryCount || 3;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = await callAI(prompt, candidate.config);
-        return { response, config: candidate.config, usedFallback: !candidate.isPrimary };
-      } catch (err) {
-        lastError = err;
-        const msg = err.message || '';
-        const retryable = isFallbackableAIError(err);
-        if (attempt < maxAttempts - 1 && retryable) {
-          const delay = /quota|rate|429/i.test(msg) ? 30000 * (attempt + 1) : 5000 * Math.pow(2, attempt);
-          await new Promise(r => setTimeout(r, delay));
-          continue;
-        }
-        if (!retryable) throw err;
-        break;
-      }
-    }
-  }
-  throw lastError || new Error('AI generation failed on all providers');
 }
 
 function formatConversation(messages) {
@@ -243,6 +73,7 @@ ${prdContent}
   return prompt;
 }
 
+// ponytail: buildDocPrompt parallels sequentialPrompts.ts buildFilePrompt — keep in sync.
 function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit, contextLevel = 'high') {
   const fileName = FILE_ORDER[fileIndex];
   const conversation = formatConversation(messages);
@@ -479,6 +310,83 @@ ${conversationSection}
 Generate only the file ${fileName} now.`;
 }
 
+const N8N_SYSTEM_PROMPT = `Anda adalah senior n8n workflow engineer. Tugas Anda adalah membuat workflow n8n yang AKURAT, SIAP PAKAI, dan BEBAS ERROR berdasarkan percakapan user di bawah.
+
+PENTING: Workflow harus valid saat di-import ke n8n. DILARANG keras menggunakan placeholder, "TODO", "ganti dengan...", atau "sesuaikan". Semua parameter harus terisi nilai konkret.
+
+========================================
+CONTOH WORKFLOW VALID (jadikan referensi)
+========================================
+{
+  "name": "Kirim Notifikasi Email untuk Order Baru",
+  "nodes": [
+    {
+      "id": "webhook-001",
+      "name": "Terima Order dari Shopee",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 300],
+      "parameters": { "path": "shopee-new-order", "httpMethod": "POST", "responseMode": "onReceived", "options": {} }
+    },
+    {
+      "id": "respond-001",
+      "name": "Konfirmasi ke Shopee",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "parameters": { "respondWith": "json", "options": { "responseBody": "={{\\n  \\"status\\": \\"ok\\", \\"message\\": \\"Order diterima\\"\n}}" } }
+    },
+    {
+      "id": "set-001",
+      "name": "Siapkan Data Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [500, 300],
+      "parameters": { "values": { "string": [ { "name": "toEmail", "value": "={{ \\$json.customer_email }}" }, { "name": "subject", "value": "Order Baru #{{ \\$json.order_id }}" } ] }, "options": {} }
+    },
+    {
+      "id": "email-001",
+      "name": "Kirim Email Notifikasi",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [750, 300],
+      "parameters": { "fromEmail": "noreply@tokoku.com", "toEmail": "={{ \\$json.toEmail }}", "subject": "={{ \\$json.subject }}", "text": "Halo, order baru diterima.", "options": {} }
+    }
+  ],
+  "connections": {
+    "Terima Order dari Shopee": [ [ { "node": "Konfirmasi ke Shopee", "type": "main", "index": 0 } ] ],
+    "Konfirmasi ke Shopee": [ [ { "node": "Siapkan Data Email", "type": "main", "index": 0 } ] ],
+    "Siapkan Data Email": [ [ { "node": "Kirim Email Notifikasi", "type": "main", "index": 0 } ] ]
+  }
+}
+
+=============================
+ATURAN PENTING
+=============================
+1. Workflow HARUS valid JSON siap import — tidak boleh error di n8n
+2. Gunakan nama node deskriptif (bukan "Webhook" tapi "Terima Pesanan")
+3. Posisi node: trigger di x:0, proses di x:250-500, output di x:750+
+4. Branching: atur posisi y berbeda untuk tiap cabang
+5. Kredential kosongkan — user isi sendiri setelah import
+6. typeVersion: 2 untuk node modern (Webhook, HTTP Request, Set), 1 untuk sisanya
+7. Minimal workflow: 1 trigger + 1 proses + 1 output
+
+=============================
+OUTPUT FORMAT — HARUS JSON MURNI
+=============================
+{
+  "workflow": {
+    "name": "Nama Workflow",
+    "nodes": [ ... ],
+    "connections": { ... }
+  },
+  "setupInstructions": "markdown dengan 10 seksi lengkap"
+}
+
+=============================
+PERCAKAPAN USER
+=============================`;
+
 async function generateDocs(supabase, sessionId, messages, config, fallbackCandidates) {
   const { data: session } = await supabase
     .from('sessions')
@@ -600,242 +508,6 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
     .from('sessions')
     .update({ generated_at: new Date().toISOString() })
     .eq('id', sessionId);
-}
-
-const N8N_SYSTEM_PROMPT = `Anda adalah senior n8n workflow engineer. Tugas Anda adalah membuat workflow n8n yang AKURAT, SIAP PAKAI, dan BEBAS ERROR berdasarkan percakapan user di bawah.
-
-PENTING: Workflow harus valid saat di-import ke n8n. DILARANG keras menggunakan placeholder, "TODO", "ganti dengan...", atau "sesuaikan". Semua parameter harus terisi nilai konkret.
-
-========================================
-CONTOH WORKFLOW VALID (jadikan referensi)
-========================================
-{
-  "name": "Kirim Notifikasi Email untuk Order Baru",
-  "nodes": [
-    {
-      "id": "webhook-001",
-      "name": "Terima Order dari Shopee",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [0, 300],
-      "parameters": { "path": "shopee-new-order", "httpMethod": "POST", "responseMode": "onReceived", "options": {} }
-    },
-    {
-      "id": "respond-001",
-      "name": "Konfirmasi ke Shopee",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [250, 300],
-      "parameters": { "respondWith": "json", "options": { "responseBody": "={{\\n  \\"status\\": \\"ok\\", \\"message\\": \\"Order diterima\\"\n}}" } }
-    },
-    {
-      "id": "set-001",
-      "name": "Siapkan Data Email",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 2,
-      "position": [500, 300],
-      "parameters": { "values": { "string": [ { "name": "toEmail", "value": "={{ \\$json.customer_email }}" }, { "name": "subject", "value": "Order Baru #{{ \\$json.order_id }}" } ] }, "options": {} }
-    },
-    {
-      "id": "email-001",
-      "name": "Kirim Email Notifikasi",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 1,
-      "position": [750, 300],
-      "parameters": { "fromEmail": "noreply@tokoku.com", "toEmail": "={{ \\$json.toEmail }}", "subject": "={{ \\$json.subject }}", "text": "Halo, order baru diterima.", "options": {} }
-    }
-  ],
-  "connections": {
-    "Terima Order dari Shopee": [ [ { "node": "Konfirmasi ke Shopee", "type": "main", "index": 0 } ] ],
-    "Konfirmasi ke Shopee": [ [ { "node": "Siapkan Data Email", "type": "main", "index": 0 } ] ],
-    "Siapkan Data Email": [ [ { "node": "Kirim Email Notifikasi", "type": "main", "index": 0 } ] ]
-  }
-}
-
-=============================
-ATURAN PENTING
-=============================
-1. Workflow HARUS valid JSON siap import — tidak boleh error di n8n
-2. Gunakan nama node deskriptif (bukan "Webhook" tapi "Terima Pesanan")
-3. Posisi node: trigger di x:0, proses di x:250-500, output di x:750+
-4. Branching: atur posisi y berbeda untuk tiap cabang
-5. Kredential kosongkan — user isi sendiri setelah import
-6. typeVersion: 2 untuk node modern (Webhook, HTTP Request, Set), 1 untuk sisanya
-7. Minimal workflow: 1 trigger + 1 proses + 1 output
-
-=============================
-OUTPUT FORMAT — HARUS JSON MURNI
-=============================
-{
-  "workflow": {
-    "name": "Nama Workflow",
-    "nodes": [ ... ],
-    "connections": { ... }
-  },
-  "setupInstructions": "markdown dengan 10 seksi lengkap"
-}
-
-=============================
-PERCAKAPAN USER
-=============================`;
-
-function extractJson(text) {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') depth--;
-    if (depth === 0) return text.slice(start, i + 1);
-  }
-  return null;
-}
-
-function generateId() {
-  return 'node-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-}
-
-function autoFixWorkflow(workflow) {
-  const fixes = [];
-  const nodes = workflow.nodes;
-  if (!Array.isArray(nodes)) return { workflow, fixes };
-
-  const hasWebhook = nodes.some(n => n.type === 'n8n-nodes-base.webhook');
-  const hasRespond = nodes.some(n => n.type === 'n8n-nodes-base.respondToWebhook');
-
-  if (hasWebhook && !hasRespond) {
-    const webhookNode = nodes.find(n => n.type === 'n8n-nodes-base.webhook');
-    const webhookName = (webhookNode?.name) || 'Webhook';
-    const respondId = generateId();
-    const respondNode = {
-      id: respondId,
-      name: 'Balas Webhook',
-      type: 'n8n-nodes-base.respondToWebhook',
-      typeVersion: 1,
-      position: [250, 300],
-      parameters: { respondWith: 'json', options: {} },
-    };
-
-    const lastNode = nodes[nodes.length - 1];
-    const lastX = (lastNode?.position?.[0] || 250) + 250;
-    respondNode.position = [lastX, 300];
-    nodes.push(respondNode);
-
-    let connections = workflow.connections || {};
-    const connectionsObj = connections;
-    const webhookConns = connectionsObj[webhookName];
-
-    if (webhookConns && webhookConns.length > 0) {
-      const firstTarget = webhookConns[0]?.[0]?.node;
-      if (firstTarget) {
-        connectionsObj[respondNode.name] = [
-          [{ node: firstTarget, type: 'main', index: 0 }],
-        ];
-        webhookConns[0] = [{ node: respondNode.name, type: 'main', index: 0 }];
-      }
-    }
-    workflow.connections = connectionsObj;
-    fixes.push('Auto-fix: Menambahkan Respond to Webhook node');
-  }
-
-  for (const node of nodes) {
-    if (!node.id || node.id === '') {
-      node.id = generateId();
-      fixes.push(`Auto-fix: Mengisi ID untuk node "${node.name}"`);
-    }
-    if (node.typeVersion === undefined || node.typeVersion === null) {
-      const typeStr = node.type || '';
-      if (typeStr.includes('webhook') || typeStr.includes('httpRequest') || typeStr.includes('set')) {
-        node.typeVersion = 2;
-      } else {
-        node.typeVersion = 1;
-      }
-      fixes.push(`Auto-fix: Mengisi typeVersion untuk node "${node.name}"`);
-    }
-  }
-
-  return { workflow, fixes };
-}
-
-function validateN8nWorkflow(workflowJson) {
-  const errors = [];
-  const warnings = [];
-  const KNOWN_PREFIXES = ['n8n-nodes-base.', 'n8n-nodes-langchain.', '@n8n/'];
-
-  let parsed;
-  try {
-    parsed = JSON.parse(workflowJson);
-  } catch {
-    return { valid: false, errors: ['Invalid JSON'], warnings: [], workflow: null };
-  }
-
-  if (!parsed.name || typeof parsed.name !== 'string') {
-    errors.push('Missing or invalid "name"');
-  }
-
-  const nodes = parsed.nodes;
-  if (!Array.isArray(nodes) || nodes.length === 0) {
-    errors.push('Missing or empty "nodes"');
-    return { valid: false, errors, warnings: [], workflow: null };
-  }
-
-  if (nodes.length < 2) {
-    errors.push('Minimal 2 nodes');
-  }
-
-  const nodeNames = new Set();
-  const nodeIds = new Set();
-  let hasWebhook = false;
-  let hasRespondWebhook = false;
-  let hasTrigger = false;
-
-  for (const node of nodes) {
-    if (!node.name || typeof node.name !== 'string') {
-      errors.push(`Node missing name`);
-    } else if (nodeNames.has(node.name)) {
-      errors.push(`Duplicate name: "${node.name}"`);
-    } else {
-      nodeNames.add(node.name);
-    }
-
-    if (!node.id || typeof node.id !== 'string') {
-      errors.push(`Node "${node.name}" missing id`);
-    } else if (nodeIds.has(node.id)) {
-      errors.push(`Duplicate id: "${node.id}"`);
-    } else {
-      nodeIds.add(node.id);
-    }
-
-    if (!node.type || typeof node.type !== 'string') {
-      errors.push(`Node "${node.name}" missing type`);
-    } else {
-      const nodeType = node.type;
-      const valid = KNOWN_PREFIXES.some(p => nodeType.startsWith(p));
-      if (!valid) errors.push(`Node "${node.name}" invalid type prefix`);
-      if (nodeType === 'n8n-nodes-base.webhook') { hasWebhook = true; hasTrigger = true; }
-      if (nodeType === 'n8n-nodes-base.respondToWebhook') hasRespondWebhook = true;
-      if (nodeType === 'n8n-nodes-base.scheduleTrigger') hasTrigger = true;
-    }
-  }
-
-  if (hasWebhook && !hasRespondWebhook) {
-    errors.push('Webhook tanpa Respond to Webhook');
-  }
-  if (!hasTrigger) {
-    errors.push('Tidak ada trigger node');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-    warnings,
-    workflow: errors.length === 0 ? parsed : null,
-  };
 }
 
 async function generateN8n(supabase, sessionId, messages, config) {

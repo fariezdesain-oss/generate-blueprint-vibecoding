@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { ensureProfile } from '@/lib/db/ensureProfile';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { withAuth } from '@/lib/utils/apiAuth';
 
 export const GET = withAuth(async (
@@ -73,7 +72,7 @@ export const POST = withAuth(async (
 export const PATCH = withAuth(async (
   req,
   _,
-  _supabase,
+  supabase,
   user
 ) => {
   const { session_id, title } = await req.json();
@@ -85,16 +84,7 @@ export const PATCH = withAuth(async (
     );
   }
 
-  // Bypass RLS via service role key (RLS tidak punya UPDATE policy untuk sessions)
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: { autoRefreshToken: false, persistSession: false },
-    },
-  );
-
-  const { data: updated, error } = await supabaseAdmin
+  const { data: updated, error } = await supabase
     .from('sessions')
     .update({ title, updated_at: new Date().toISOString() })
     .eq('id', session_id)

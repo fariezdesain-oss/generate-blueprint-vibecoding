@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { FILE_ORDER, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 
 export async function GET(
@@ -126,13 +125,7 @@ export async function DELETE(
     );
   }
 
-  const supabaseAdmin = createSupabaseClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { autoRefreshToken: false, persistSession: false } },
-  );
-
-  const { error: updateError } = await supabaseAdmin
+  const { error: updateError } = await supabase
     .from('sessions')
     .update({
       generated_files: null,

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
-import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
@@ -152,13 +151,6 @@ export async function POST(req: Request) {
 
     const updatedFiles = { ...existingFiles, [fileName]: fileContent };
 
-    // sessions table tidak punya UPDATE policy, bypass RLS via service role key
-    const supabaseAdmin = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-
     const updateData: Record<string, unknown> = {
       generated_files: updatedFiles,
       updated_at: new Date().toISOString(),
@@ -167,7 +159,7 @@ export async function POST(req: Request) {
       updateData.generated_at = new Date().toISOString();
     }
 
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabase
       .from('sessions')
       .update(updateData)
       .eq('id', session_id)
