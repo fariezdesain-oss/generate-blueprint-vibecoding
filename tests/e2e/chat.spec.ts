@@ -47,3 +47,46 @@ test('chat bisa mengirim pesan dengan mock streaming', async ({ page }) => {
   await expect(page.getByText('Halo dari E2E')).toBeVisible();
   await expect(page.getByText('E2E_CHAT_SENTINEL')).toBeVisible();
 });
+
+test('chat regenerate parsial hanya memproses file yang diminta', async ({ page }) => {
+  await bukaSesiChat(page);
+  const sequentialCalls: number[] = [];
+  let deletedFiles: string[] = [];
+
+  await page.route('**/api/chat**', async (route) => {
+    if (route.request().method() === 'POST') {
+      const content = 'Saya akan regenerate 08_TASKS.md, 09_AI_RULES.md. Saya rasa informasi sudah cukup. Klik \'Generate Documentation\' untuk menghasilkan 9 dokumen spesifikasi.';
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/plain',
+        body: `${JSON.stringify({ token: content })}\n${JSON.stringify({ done: true, message: { id: 'msg_partial', role: 'assistant', content } })}\n`,
+      });
+      return;
+    }
+    await route.fulfill({ json: { success: true, data: { messages: [], title: 'E2E Chat', mode: 'docs', project_state: {}, rolling_summary: '' } } });
+  });
+
+  await page.route('**/api/sessions/ses_e2e_chat/files', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      const body = route.request().postDataJSON();
+      deletedFiles = body.target_files;
+      await route.fulfill({ json: { success: true, data: { deleted_files: deletedFiles } } });
+      return;
+    }
+    await route.fulfill({ json: { success: true, data: { files: { '01_PRD.md': '# PRD' }, generation_status: null } } });
+  });
+
+  await page.route('**/api/generate/sequential', async (route) => {
+    const body = route.request().postDataJSON();
+    sequentialCalls.push(body.file_index);
+    await route.fulfill({ json: { success: true, data: { file_index: body.file_index } } });
+  });
+
+  await page.getByPlaceholder('Ketik pesan...').fill('Generate ulang tasks dan AI rules');
+  await page.getByPlaceholder('Ketik pesan...').press('Enter');
+  await expect(page.getByText(/Saya akan regenerate 08_TASKS.md/)).toBeVisible();
+  await page.getByLabel('Generate dokumentasi').click();
+
+  await expect.poll(() => sequentialCalls).toEqual([7, 8]);
+  expect(deletedFiles).toEqual(['08_TASKS.md', '09_AI_RULES.md']);
+});

@@ -66,23 +66,23 @@ export function buildProjectContext(projectState: ProjectState | null | undefine
   return sections.join('\n\n');
 }
 
-export function buildProjectStatePrompt(currentState: ProjectState, latestContent: string): string {
+export function buildProjectStatePrompt(currentState: ProjectState, recentMessages: ChatMessage[]): string {
   return `Anda adalah ekstraktor requirement proyek. WAJIB gunakan Bahasa Indonesia.
 
-Tugas Anda: baca pesan terbaru, lalu keluarkan JSON diff untuk memperbarui Project State.
+Tugas Anda: baca percakapan terbaru, lalu keluarkan JSON diff untuk memperbarui Project State.
 
 Aturan:
-- Balas hanya JSON valid, tanpa markdown.
-- jangan hapus informasi lama.
+- Balas HANYA dengan JSON valid.
+- Jangan hapus informasi lama jika masih relevan.
 - Jangan mengarang hal yang tidak tertulis.
-- Jika pesan tidak menambah informasi proyek, balas {}.
-- Gunakan kategori yang jelas seperti nama_proyek, deskripsi, target_pengguna, fitur, tech_stack, database_schema, api_endpoints, ui_design, alur_pengguna, constraint, catatan_tambahan.
+- Jika pesan terbaru tidak menambah informasi proyek (misal hanya sapaan/basa-basi), balas dengan objek kosong: {}
+- Gunakan kategori yang jelas (contoh: nama_proyek, deskripsi, target_pengguna, fitur_inti, integrasi, desain_ui, dll).
 
 PROJECT STATE SAAT INI:
 ${JSON.stringify(currentState || {}, null, 2)}
 
-PESAN TERBARU:
-${latestContent}`;
+PERCAKAPAN TERBARU:
+${recentMessages.map((m) => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n')}`;
 }
 
 export function shouldBuildRollingSummary(messageCount: number): boolean {
@@ -90,12 +90,44 @@ export function shouldBuildRollingSummary(messageCount: number): boolean {
 }
 
 function extractJsonObject(text: string): ProjectState {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return {};
+  let startIndex = -1;
+  let endIndex = -1;
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        if (depth === 0) startIndex = i;
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0 && startIndex !== -1) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (startIndex === -1 || endIndex === -1) return {};
 
   try {
-    const parsed = JSON.parse(text.slice(start, end + 1));
+    const parsed = JSON.parse(text.substring(startIndex, endIndex + 1));
     return isPlainObject(parsed) ? parsed : {};
   } catch {
     return {};
@@ -106,7 +138,7 @@ export async function updateProjectState(
   supabase: SupabaseClient,
   sessionId: string,
   aiConfig: AIProviderConfig,
-  latestContent: string,
+  messages: ChatMessage[],
 ): Promise<void> {
   const { data: session } = await supabase
     .from('sessions')
@@ -116,7 +148,9 @@ export async function updateProjectState(
 
   const currentState = isProjectStateUseful(session?.project_state) ? session.project_state : {};
   const provider = createProvider(aiConfig.providerName);
-  const response = await provider.generateChat(buildProjectStatePrompt(currentState, latestContent), aiConfig);
+  
+  const recentMessages = messages.slice(-5);
+  const response = await provider.generateChat(buildProjectStatePrompt(currentState, recentMessages), aiConfig);
   const patch = extractJsonObject(response);
   if (!isProjectStateUseful(patch)) return;
 

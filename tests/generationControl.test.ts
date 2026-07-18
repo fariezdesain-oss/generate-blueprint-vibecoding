@@ -8,6 +8,10 @@ describe('generationControl', () => {
     expect(shouldContinueGeneration({ completed: false, nextFile: '02_ARCHITECTURE.md' })).toBe(true);
   });
 
+  it('does not continue after user stops document generation', () => {
+    expect(shouldContinueGeneration({ completed: false }, false)).toBe(false);
+  });
+
   it('does not restart an accepted background job', () => {
     expect(shouldContinueGeneration({ jobId: 'session-1', mode: 'docs' })).toBe(false);
     expect(shouldContinueGeneration({ jobId: 'session-1', backgroundPending: true })).toBe(false);

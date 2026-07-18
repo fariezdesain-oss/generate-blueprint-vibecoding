@@ -7,6 +7,7 @@ import { ChatWindow } from '@/components/ui/ChatWindow';
 import { Send, FileText, Square } from 'lucide-react';
 import { FILE_ORDER, FILE_LABELS, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 import { shouldContinueGeneration } from '@/lib/utils/generationControl';
+import { clearActiveChatSession } from '@/lib/utils/browserSession';
 import { FilePicker } from '@/components/ui/FilePicker';
 import { ProjectStatePanel } from '@/components/ui/ProjectStatePanel';
 import type { Attachment } from '@/types/chat';
@@ -63,9 +64,10 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   }, [chatError, setChatError]);
   const abortRef = useRef<AbortController | null>(null);
   const generateCooldownRef = useRef(false);
-  const regenerateRequestedRef = useRef(false);
+  const regenerateRequestedRef = useRef<{ all: true } | { files: string[] } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollingActiveRef = useRef(false);
+  const partialGenerationAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     return () => {
@@ -74,7 +76,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   }, []);
 
   useEffect(() => {
-    regenerateRequestedRef.current = false;
+    regenerateRequestedRef.current = null;
   }, [sessionId]);
 
   useEffect(() => {
@@ -96,6 +98,12 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     return content.toLowerCase().includes('generate ulang dari awal');
   };
 
+  const extractPartialRegenerateFiles = (content: string) => {
+    const lower = content.toLowerCase();
+    if (!lower.includes('saya akan regenerate')) return [];
+    return FILE_ORDER.filter((fileName) => lower.includes(fileName.toLowerCase()));
+  };
+
   const switchingSession = !!sessionIdUrlParam && sessionId !== sessionIdUrlParam;
 
   useEffect(() => {
@@ -104,8 +112,14 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
       useChatStore.getState().reset();
       fetch(`/api/chat?session_id=${sessionIdUrlParam}`)
         .then((r) => {
+          if (r.status === 401) {
+            clearActiveChatSession(sessionStorage);
+            useChatStore.getState().reset();
+            router.replace('/login');
+            return null;
+          }
           if (!r.ok) {
-            sessionStorage.removeItem('activeSessionId');
+            clearActiveChatSession(sessionStorage);
             useChatStore.getState().reset();
             router.replace('/chat');
             return null;
@@ -136,7 +150,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
           setCanGenerate(!!hasSignal);
         })
         .catch(() => {
-          sessionStorage.removeItem('activeSessionId');
+          clearActiveChatSession(sessionStorage);
           useChatStore.getState().reset();
           router.replace('/chat');
         })
@@ -223,9 +237,17 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         const res = await fetch(`/api/chat?session_id=${targetId}`, {
           signal: abort.signal,
         });
+        if (res.status === 401) {
+          if (activeSessionRef.current === targetId) {
+            clearActiveChatSession(sessionStorage);
+            useChatStore.getState().reset();
+            router.replace('/login');
+          }
+          return;
+        }
         if (res.status === 404) {
           if (activeSessionRef.current === targetId) {
-            sessionStorage.removeItem('activeSessionId');
+            clearActiveChatSession(sessionStorage);
             setSessionId(null);
             router.replace('/chat');
           }
@@ -364,8 +386,11 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 if (!canGenerate && hasReadinessSignal(parsed.message.content)) {
                   setCanGenerate(true);
                 }
-                if (hasRegenerateSignal(parsed.message.content)) {
-                  regenerateRequestedRef.current = true;
+                const targetFiles = extractPartialRegenerateFiles(parsed.message.content);
+                if (targetFiles.length > 0) {
+                  regenerateRequestedRef.current = { files: targetFiles };
+                } else if (hasRegenerateSignal(parsed.message.content)) {
+                  regenerateRequestedRef.current = { all: true };
                 }
               }
             }
@@ -399,6 +424,8 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
 
   function stopPolling() {
     pollingActiveRef.current = false;
+    partialGenerationAbortRef.current?.abort();
+    partialGenerationAbortRef.current = null;
     if (pollingRef.current) clearTimeout(pollingRef.current);
     pollingRef.current = null;
     setGenerating(false);
@@ -491,19 +518,30 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   const handleGenerate = async () => {
     if (!sessionId || generating || generateCooldownRef.current) return;
 
-    const shouldRegenerate = regenerateRequestedRef.current;
-    regenerateRequestedRef.current = false;
+    const regenerateRequest = regenerateRequestedRef.current;
+    regenerateRequestedRef.current = null;
+    const targetFiles = regenerateRequest && 'files' in regenerateRequest ? regenerateRequest.files : [];
+    const shouldRegenerateAll = !!regenerateRequest && 'all' in regenerateRequest;
+    const shouldRegeneratePartial = targetFiles.length > 0;
 
-    if (shouldRegenerate) {
+    if (shouldRegenerateAll) {
       await fetch(`/api/sessions/${sessionId}/files`, { method: 'DELETE' }).catch(() => {});
+    } else if (shouldRegeneratePartial) {
+      await fetch(`/api/sessions/${sessionId}/files`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_files: targetFiles }),
+      }).catch(() => {});
     }
 
     const filesRes = await fetch(`/api/sessions/${sessionId}/files`);
     let existingCount = 0;
     let hasN8nExisting = false;
+    let generationStatus: string | null = null;
     if (filesRes.ok) {
       const filesJson = await filesRes.json();
       if (filesJson.success) {
+        generationStatus = filesJson.data.generation_status || null;
         if (mode === 'n8n' && filesJson.data.n8n_workflow) {
           hasN8nExisting = true;
         }
@@ -513,12 +551,12 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
       }
     }
 
-    if (mode === 'n8n' && hasN8nExisting && !shouldRegenerate) {
+    if (mode === 'n8n' && hasN8nExisting && !shouldRegenerateAll && !shouldRegeneratePartial) {
       router.push(`/generate/results?session_id=${sessionId}&mode=n8n`);
       return;
     }
 
-    if (mode !== 'n8n' && existingCount >= FILE_ORDER.length && !shouldRegenerate) {
+    if (mode !== 'n8n' && existingCount >= FILE_ORDER.length && !shouldRegenerateAll && !shouldRegeneratePartial) {
       router.push(`/generate/results?session_id=${sessionId}`);
       return;
     }
@@ -527,9 +565,87 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     setChatError(null);
     setGenProgress({ current: existingCount, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: Math.round((existingCount / FILE_ORDER.length) * 100), stage: '', stageMessage: '' });
 
+    if (shouldRegeneratePartial) {
+      pollingActiveRef.current = true;
+      try {
+        for (let i = 0; i < targetFiles.length; i++) {
+          if (!pollingActiveRef.current) break;
+          const fileName = targetFiles[i];
+          const fileIndex = FILE_ORDER.indexOf(fileName);
+          if (fileIndex === -1) {
+            stopPolling();
+            setChatError(`File target ${fileName} tidak valid.`);
+            return;
+          }
+
+          setGenProgress({
+            current: i,
+            total: targetFiles.length,
+            fileName,
+            fileProgress: 25,
+            overallProgress: Math.round((i / targetFiles.length) * 100),
+            stage: 'generating',
+            stageMessage: `Regenerate ${FILE_LABELS[fileName] || fileName}...`,
+          });
+
+          const controller = new AbortController();
+          partialGenerationAbortRef.current = controller;
+          const res = await fetch('/api/generate/sequential', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId, file_index: fileIndex }),
+            signal: controller.signal,
+          });
+          partialGenerationAbortRef.current = null;
+
+          if (!res.ok) {
+            stopPolling();
+            if (res.status === 401) {
+              clearActiveChatSession(sessionStorage);
+              useChatStore.getState().reset();
+              router.replace('/login');
+            } else {
+              setChatError(`Gagal regenerate ${fileName}. Silakan coba lagi.`);
+            }
+            return;
+          }
+
+          const json = await res.json();
+          if (!json.success) {
+            stopPolling();
+            setChatError(json?.error?.message || `Gagal regenerate ${fileName}.`);
+            return;
+          }
+
+          if (!pollingActiveRef.current) break;
+          setGenProgress({
+            current: i + 1,
+            total: targetFiles.length,
+            fileName,
+            fileProgress: 100,
+            overallProgress: Math.round(((i + 1) / targetFiles.length) * 100),
+            stage: 'done',
+            stageMessage: `${FILE_LABELS[fileName] || fileName} selesai di-regenerate.`,
+          });
+        }
+
+        if (!pollingActiveRef.current) return;
+        stopPolling();
+        router.push(`/generate/results?session_id=${sessionId}`);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        stopPolling();
+        setChatError('Gagal regenerate file pilihan. Silakan coba lagi.');
+      }
+      return;
+    }
+
     pollForResults(mode);
 
+    if (generationStatus === 'generating') return;
+
     const runNext = async () => {
+      if (!pollingActiveRef.current) return;
       try {
         const res = await fetch('/api/generate/start', {
           method: 'POST',
@@ -542,7 +658,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
           setChatError(json?.error?.message || 'Gagal memulai generate. Silakan coba lagi.');
           return;
         }
-        if (shouldContinueGeneration(json.data) && pollingActiveRef.current) {
+        if (shouldContinueGeneration(json.data, pollingActiveRef.current)) {
           setTimeout(runNext, 500);
         }
       } catch {
@@ -705,6 +821,16 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 <span className="inline-block size-2 rounded-full bg-emerald-400 animate-bounce-dot" style={{ animationDelay: '-0.16s' }} />
                 <span className="inline-block size-2 rounded-full bg-emerald-400 animate-bounce-dot" style={{ animationDelay: '0s' }} />
               </div>
+              <button
+                onClick={stopPolling}
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
+              >
+                <Square className="size-4 fill-current" />
+                Hentikan Generate
+              </button>
+              <p className="text-center text-xs font-semibold text-tertiary">
+                File yang sudah selesai tetap tersimpan dan bisa dilanjutkan.
+              </p>
             </div>
           </div>
         </div>
@@ -773,6 +899,16 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 <span className="inline-block size-2 rounded-full bg-gemini-blue animate-bounce-dot" style={{ animationDelay: '-0.16s' }} />
                 <span className="inline-block size-2 rounded-full bg-gemini-blue animate-bounce-dot" style={{ animationDelay: '0s' }} />
               </div>
+              <button
+                onClick={stopPolling}
+                className="flex min-h-11 items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
+              >
+                <Square className="size-4 fill-current" />
+                Hentikan Generate
+              </button>
+              <p className="text-center text-xs font-semibold text-tertiary">
+                File yang sudah selesai tetap tersimpan dan bisa dilanjutkan.
+              </p>
             </div>
           </div>
         </div>
@@ -797,7 +933,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         </div>
       )}
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 relative">
         <ChatWindow loadingMessages={loadingMessages || switchingSession} />
         {sessionId && !switchingSession && mode === 'docs' && (
           <ProjectStatePanel sessionId={sessionId} />
@@ -847,6 +983,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                         : 'bg-tertiary border border-subtle hover:bg-tertiary hover:border-gemini-blue/30 text-primary hover:text-gemini-blue'
                       : 'bg-secondary border border-subtle text-tertiary'
                   }`}
+                  aria-label={mode === 'n8n' ? 'Generate workflow n8n' : 'Generate dokumentasi'}
                   title={
                     canGenerate
                       ? mode === 'n8n' ? 'Generate n8n Workflow' : 'Generate 9 Engineering Documents'

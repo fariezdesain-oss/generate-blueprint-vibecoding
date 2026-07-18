@@ -163,21 +163,32 @@ function GenerateResultsContent() {
     setRegenerating(fileName);
     setError(null);
 
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120000);
+
     try {
       const res = await fetch('/api/generate/sequential', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, file_index: fileIndex }),
+        signal: controller.signal,
       });
+      clearTimeout(timer);
 
       const json = await res.json();
       if (json.success) {
+        sessionStorage.removeItem(`generateResult_${sessionId}`);
         await loadFiles();
       } else {
         setError(json.error?.message || 'Gagal regenerate dokumen');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Gagal regenerate dokumen');
+      clearTimeout(timer);
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('Regenerate memakan waktu terlalu lama. Coba lagi atau gunakan provider yang lebih cepat.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Gagal regenerate dokumen');
+      }
     } finally {
       setRegenerating(null);
     }
@@ -445,8 +456,8 @@ function GenerateResultsContent() {
                     disabled={regenerating !== null}
                     className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-40"
                   >
-                    <RefreshCw className="size-3 sm:size-3.5" />
-                    <span className="hidden sm:inline">{regenerating === activeFile ? 'Regenerating...' : 'Regenerate'}</span>
+                    <RefreshCw className={`size-3 sm:size-3.5 ${regenerating === activeFile ? 'animate-spin text-gemini-blue' : ''}`} />
+                    <span className="hidden sm:inline">{regenerating === activeFile ? `Regenerating...` : 'Regenerate'}</span>
                   </button>
                   <button
                     onClick={() => handleCopy(files[activeFile], activeFile)}

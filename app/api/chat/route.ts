@@ -80,11 +80,19 @@ Jangan pernah mengirim sinyal ini jika informasi masih kurang.
 
 10. **Never generate code or docs** — Only gather requirements. No code snippets, no architecture plans.
 
-11. **Regenerate from scratch** — Jika user meminta membuat ulang hasil generate (misal: "buat ulang", "generate ulang", "hasilnya kurang", "reset", "dari awal"), EVALUASI apakah informasi proyek sudah cukup (sama seperti rule #7). Jika sudah, kirim KEDUA sinyal berikut secara berurutan dalam respons:
+11. **Regenerate from scratch** — Jika user meminta membuat ulang SEMUA hasil generate (misal: "buat ulang semua", "generate ulang dari awal", "reset semua", "dari awal"), EVALUASI apakah informasi proyek sudah cukup (sama seperti rule #7). Jika sudah, kirim KEDUA sinyal berikut secara berurutan dalam respons:
    "Saya akan generate ulang dari awal."
    "Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan ${DOC_COUNT} dokumen spesifikasi."
    Jika informasi belum cukup, jelaskan apa yang kurang dan JANGAN kirim kedua sinyal tersebut.
    Jika user hanya menyebut "lanjutkan" atau "generate" tanpa "ulang"/"reset"/"dari awal", jangan kirim sinyal regenerate.
+
+12. **Regenerate file tertentu** — Jika user meminta generate ulang hanya file tertentu (misal: "generate ulang task.md", "perbaiki architecture", "ulang AI rules", "regenerate PRD dan Tasks"), EVALUASI file mana yang dimaksud dari daftar 9 dokumen. Jika sudah jelas, kirim sinyal dengan format PERSIS:
+   "Saya akan regenerate 08_TASKS.md, 09_AI_RULES.md."
+   WAJIB gunakan nama file persis dari daftar: 01_PRD.md, 02_ARCHITECTURE.md, 03_DATA_MODELS.md, 04_PROJECT_STANDARDS.md, 05_DESIGN_SYSTEM.md, 06_DELIVERY.md, 07_AGENT_CONTEXT.md, 08_TASKS.md, 09_AI_RULES.md.
+   Boleh lebih dari satu file, pisahkan dengan koma.
+   Setelah sinyal file tertentu, kirim juga kalimat readiness:
+   "Saya rasa informasi sudah cukup. Klik 'Generate Documentation' untuk menghasilkan ${DOC_COUNT} dokumen spesifikasi."
+   Jangan gunakan sinyal ini jika user meminta regenerate semua file; gunakan rule #11.
 
 Jaga respons tetap ringkas dan fokus.`;
 
@@ -168,11 +176,13 @@ function scheduleProjectMemoryUpdate(
   supabase: SupabaseClient,
   sessionId: string,
   aiConfig: AIProviderConfig,
-  latestContent: string,
   messages: { role: string; content: string }[],
 ) {
+  // Hanya jalankan ekstraksi state setiap 3 pesan (atau di pesan pertama) untuk menghemat limit API
+  const shouldUpdateState = messages.length <= 2 || messages.length % 3 === 0;
+
   Promise.allSettled([
-    updateProjectState(supabase, sessionId, aiConfig, latestContent),
+    shouldUpdateState ? updateProjectState(supabase, sessionId, aiConfig, messages) : Promise.resolve(),
     updateRollingSummary(supabase, sessionId, aiConfig, messages),
   ]).catch(() => undefined);
 }
@@ -374,7 +384,6 @@ export const POST = withAuth(async (
         supabase,
         session_id,
         aiConfig,
-        aiResponse,
         [...(history || []), { role: 'assistant', content: aiResponse }],
       );
 
@@ -437,7 +446,6 @@ export const POST = withAuth(async (
             supabase,
             session_id,
             aiConfig,
-            fullResponse,
             [...(history || []), { role: 'assistant', content: fullResponse }],
           );
         }

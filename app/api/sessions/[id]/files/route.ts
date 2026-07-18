@@ -84,14 +84,14 @@ export const GET = withAuth(async (
 });
 
 export const DELETE = withAuth(async (
-  _req,
+  req,
   { params },
   supabase,
   user,
 ) => {
   const { data: session } = await supabase
     .from('sessions')
-    .select('user_id')
+    .select('user_id, generated_files')
     .eq('id', params.id)
     .single();
 
@@ -107,6 +107,44 @@ export const DELETE = withAuth(async (
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
     );
+  }
+
+  let targetFiles: string[] = [];
+  try {
+    const body = await req.json();
+    targetFiles = Array.isArray(body?.target_files)
+      ? body.target_files.filter((name: unknown) => typeof name === 'string' && FILE_ORDER.includes(name))
+      : [];
+  } catch {
+    targetFiles = [];
+  }
+
+  if (targetFiles.length > 0) {
+    const currentFiles = (session.generated_files as Record<string, string>) || {};
+    const updatedFiles = { ...currentFiles };
+    for (const fileName of targetFiles) {
+      delete updatedFiles[fileName];
+    }
+
+    const { error: partialUpdateError } = await supabase
+      .from('sessions')
+      .update({
+        generated_files: Object.keys(updatedFiles).length > 0 ? updatedFiles : null,
+        generation_progress: null,
+        generation_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.id)
+      .eq('user_id', user.id);
+
+    if (partialUpdateError) {
+      return NextResponse.json(
+        { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: partialUpdateError.message } },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: { deleted_files: targetFiles } });
   }
 
   const { error: updateError } = await supabase

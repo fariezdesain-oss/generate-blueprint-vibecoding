@@ -41,11 +41,11 @@ describe('projectState', () => {
   });
 
   it('buildProjectStatePrompt meminta JSON diff Bahasa Indonesia', () => {
-    const prompt = buildProjectStatePrompt({ fitur: ['Login'] }, 'User ingin checkout dan payment gateway.');
+    const prompt = buildProjectStatePrompt({ fitur: ['Login'] }, [{ role: 'user', content: 'User ingin checkout dan payment gateway.' }]);
 
     expect(prompt).toContain('JSON');
     expect(prompt).toContain('Bahasa Indonesia');
-    expect(prompt).toContain('jangan hapus informasi lama');
+    expect(prompt).toContain('Jangan hapus informasi lama');
     expect(prompt).toContain('checkout');
   });
 

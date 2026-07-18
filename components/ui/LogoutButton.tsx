@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
+import { clearActiveChatSession } from '@/lib/utils/browserSession';
+import { useChatStore } from '@/store/useChatStore';
 
 export function LogoutButton() {
   const router = useRouter();
@@ -10,7 +12,13 @@ export function LogoutButton() {
 
   const handleLogout = async () => {
     setLoading(true);
-    await fetch('/api/auth/logout', { method: 'POST' });
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      // ignore network/logout errors and clear local session anyway
+    }
+    clearActiveChatSession(sessionStorage);
+    useChatStore.getState().reset();
     router.push('/login');
     router.refresh();
   };
