@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
@@ -8,109 +7,11 @@ import { validateN8nWorkflow } from '@/lib/utils/n8nValidator';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
+import { withAuth } from '@/lib/utils/apiAuth';
+import { autoFixWorkflow, extractJson } from '@/lib/utils/workflowJson';
 
-function extractJson(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') depth--;
-    if (depth === 0) return text.slice(start, i + 1);
-  }
-  return null;
-}
-
-function generateId(): string {
-  return 'node-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-}
-
-function autoFixWorkflow(workflow: Record<string, unknown>): { workflow: Record<string, unknown>; fixes: string[] } {
-  const fixes: string[] = [];
-  const nodes = workflow.nodes as Array<Record<string, unknown>> | undefined;
-  if (!nodes) return { workflow, fixes };
-
-  const hasWebhook = nodes.some(n => n.type === 'n8n-nodes-base.webhook');
-  const hasRespond = nodes.some(n => n.type === 'n8n-nodes-base.respondToWebhook');
-
-  if (hasWebhook && !hasRespond) {
-    const webhookNode = nodes.find(n => n.type === 'n8n-nodes-base.webhook');
-    const webhookName = (webhookNode?.name as string) || 'Webhook';
-    const respondId = generateId();
-    const respondNode = {
-      id: respondId,
-      name: 'Balas Webhook',
-      type: 'n8n-nodes-base.respondToWebhook',
-      typeVersion: 1,
-      position: [250, 300],
-      parameters: { respondWith: 'json', options: {} },
-    };
-
-    const lastNode = nodes[nodes.length - 1];
-    const lastX = ((lastNode?.position as number[])?.[0] || 250) + 250;
-    respondNode.position = [lastX, 300];
-
-    nodes.push(respondNode);
-
-    let connections = workflow.connections as Record<string, unknown> | undefined;
-    if (!connections) {
-      connections = {};
-    }
-
-    const connectionsObj = connections as Record<string, unknown>;
-    const webhookConns = connectionsObj[webhookName] as Array<Array<Record<string, unknown>>> | undefined;
-    if (webhookConns && webhookConns.length > 0) {
-      const firstTarget = webhookConns[0]?.[0]?.node;
-      if (firstTarget) {
-        connectionsObj[respondNode.name] = [
-          [{ node: firstTarget as string, type: 'main', index: 0 }],
-        ];
-        webhookConns[0] = [{ node: respondNode.name, type: 'main', index: 0 }];
-      }
-    }
-
-    workflow.connections = connectionsObj;
-    fixes.push('Auto-fix: Menambahkan Respond to Webhook node karena Webhook trigger ditemukan tanpa Respond to Webhook');
-  }
-
-  for (const node of nodes) {
-    if (!node.id || node.id === '') {
-      node.id = generateId();
-      fixes.push(`Auto-fix: Mengisi ID kosong untuk node "${node.name}"`);
-    }
-    if (!node.typeVersion && node.typeVersion !== 0) {
-      const typeStr = node.type as string || '';
-      if (typeStr.includes('webhook') || typeStr.includes('httpRequest') || typeStr.includes('set')) {
-        node.typeVersion = 2;
-      } else {
-        node.typeVersion = 1;
-      }
-      fixes.push(`Auto-fix: Mengisi typeVersion untuk node "${node.name}"`);
-    }
-  }
-
-  return { workflow, fixes };
-}
-
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  const limited = rateLimitResponse(`${userData.user.id}:generate`, 6, 10 * 60_000);
+export const POST = withAuth(async (req, _context, supabase, user) => {
+  const limited = await rateLimitResponse(supabase, `${user.id}:generate`, 6, 10 * 60_000);
   if (limited) return limited;
 
   const { session_id } = await req.json();
@@ -135,7 +36,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (session.user_id !== userData.user.id) {
+  if (session.user_id !== user.id) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
@@ -158,7 +59,7 @@ export async function POST(req: Request) {
   const { data: providerConfig } = await supabase
     .from('provider_configs')
     .select('*')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .eq('is_active', true)
     .single();
 
@@ -271,7 +172,7 @@ export async function POST(req: Request) {
       .from('sessions')
       .update(updateData)
       .eq('id', session_id)
-      .eq('user_id', userData.user.id);
+      .eq('user_id', user.id);
 
     if (updateError) {
       return NextResponse.json(
@@ -297,4 +198,4 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-}
+});

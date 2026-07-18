@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
+import { withAuth } from '@/lib/utils/apiAuth';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
@@ -13,18 +13,8 @@ const ALLOWED_MIMES = new Set([
   'text/markdown',
 ]);
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  const limited = rateLimitResponse(`${userData.user.id}:upload`, 30, 60_000);
+export const POST = withAuth(async (req, _context, supabase, user) => {
+  const limited = await rateLimitResponse(supabase, `${user.id}:upload`, 30, 60_000);
   if (limited) return limited;
 
   const formData = await req.formData();
@@ -65,7 +55,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (session.user_id !== userData.user.id) {
+  if (session.user_id !== user.id) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
@@ -73,7 +63,7 @@ export async function POST(req: Request) {
   }
 
   const fileName = `${crypto.randomUUID()}-${encodeURIComponent(file.name)}`;
-  const storagePath = `${userData.user.id}/${sessionId}/${fileName}`;
+  const storagePath = `${user.id}/${sessionId}/${fileName}`;
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -100,4 +90,4 @@ export async function POST(req: Request) {
   };
 
   return NextResponse.json({ success: true, data: attachment }, { status: 201 });
-}
+});

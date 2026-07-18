@@ -1,3 +1,6 @@
+import { buildProjectContext, isProjectStateUseful, type ProjectState } from '@/lib/utils/projectState';
+import { extractDocumentSummary } from '@/lib/utils/docSummary';
+
 export const FILE_ORDER: string[] = [
   '01_PRD.md',
   '02_ARCHITECTURE.md',
@@ -51,8 +54,8 @@ function formatOtherFiles(files: Record<string, string>, previewLimit: number = 
     .filter((name) => name !== '01_PRD.md' && files[name])
     .map((name) => {
       const content = files[name];
-      const text = previewLimit > 0 && content.length > previewLimit
-        ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk menghemat konteks]'
+      const text = previewLimit > 0
+        ? extractDocumentSummary(content, previewLimit)
         : content;
       return `--- ${name} (REFERENSI) ---\n${text}`;
     })
@@ -68,7 +71,8 @@ ATURAN KUALITAS:
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
 5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".
 6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md. Jika ada konflik, 01_PRD.md selalu menang.
-7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi.`;
+7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi. Jika informasi tidak ada: BERHENTI dan minta klarifikasi. JANGAN mengisi dengan asumsi. JANGAN melanjutkan dengan konteks yang tidak jelas. Setiap klaim teknis harus bisa ditelusuri ke percakapan user atau dokumen sebelumnya.
+8. URUTAN IMPLEMENTASI - 08_TASKS.md WAJIB menyusun phase dengan urutan: FASE 1 setup dan konfigurasi awal proyek; FASE 2 desain dan implementasi UI (halaman, komponen, routing, state); FASE 3 integrasi API/backend dari sisi frontend (fetch, form, auth flow di UI); FASE 4 backend/API logic (endpoint, database, business logic); FASE 5 integrasi penuh frontend-backend; FASE 6 testing, security, deployment. AI implementer WAJIB mengerjakan FASE 2 sebelum FASE 4.`;
 
 function checkConversation(messages: { role: string; content: string }[]): boolean {
   const fullText = messages.map((m) => m.content).join(' ').toLowerCase();
@@ -91,7 +95,7 @@ export function buildConsistencyPrompt(files: Record<string, string>): string {
 
 Tugas Anda:
 1. Baca 01_PRD.md sebagai acuan utama.
-2. Baca dokumen 02 sampai 09.
+2. Baca ringkasan dokumen 02 sampai 09.
 3. Periksa kontradiksi, istilah tidak selaras, fitur hilang, tech stack tidak konsisten, dan boundary dokumen yang tercampur.
 4. Jika SEMUA konsisten, balas hanya dengan teks: SEMUA KONSISTEN
 5. Jika ada yang perlu diperbaiki, keluarkan ULANG hanya file yang bermasalah secara LENGKAP, diawali dengan "# NAMAFILE.md".
@@ -101,7 +105,9 @@ ${prdContent}
 `;
 
   for (const name of FILE_ORDER.filter((fileName) => fileName !== '01_PRD.md')) {
-    if (files[name]) prompt += `\n--- ${name} ---\n${files[name]}\n`;
+    if (files[name]) {
+      prompt += `\n--- ${name} (RINGKASAN) ---\n${extractDocumentSummary(files[name], 1000)}\n`;
+    }
   }
 
   prompt += `\nSETELAH memeriksa, jika SEMUA KONSISTEN balas "SEMUA KONSISTEN". Jika ada kontradiksi, keluarkan ULANG hanya file bermasalah LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md".`;
@@ -122,9 +128,7 @@ export function buildSingleFileConsistencyPrompt(
     .filter((name) => name !== fileName && name !== '01_PRD.md' && files[name])
     .map((name) => {
       const content = files[name];
-      const text = content.length > previewLimit
-        ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk consistency check]'
-        : content;
+      const text = extractDocumentSummary(content, previewLimit);
       return `--- ${name} (REFERENSI KONSISTENSI) ---\n${text}`;
     })
     .join('\n\n');
@@ -153,20 +157,29 @@ export function buildFilePrompt(
   previousFiles: Record<string, string>,
   previewLimit: number = 0,
   contextLevel: 'low' | 'medium' | 'high' = 'high',
+  projectState?: ProjectState,
+  rollingSummary?: string,
 ): string {
   const fileName = FILE_ORDER[fileIndex];
 
-  if (!checkConversation(messages) && fileIndex === 0) return insufficientContextMessage();
+  const projectContext = buildProjectContext(projectState, rollingSummary);
+  const hasProjectContext = isProjectStateUseful(projectState) || !!rollingSummary?.trim();
+
+  if (!hasProjectContext && !checkConversation(messages) && fileIndex === 0) return insufficientContextMessage();
 
   const conversation = formatConversation(messages);
   const prdSection = formatPRDFull(previousFiles);
   const otherSection = formatOtherFiles(previousFiles, previewLimit);
+  const isPrdVeryLong = prdSection.length > 8000;
 
   let contextSection = '';
   if (prdSection || otherSection) {
     contextSection = '\n\nREFERENSI DOKUMEN SEBELUMNYA:\n\n';
     if (prdSection) contextSection += prdSection + '\n';
     if (otherSection) contextSection += '\n' + otherSection;
+    if (isPrdVeryLong) {
+      contextSection += '\n\n[CATATAN: PRD di atas sangat lengkap. Fokus pada informasi yang RELEVAN untuk dokumen ini saja. Hindari mengulang semua detail PRD — cukup referensikan jika diperlukan.]';
+    }
   }
 
   let filePrompt = '';
@@ -318,6 +331,8 @@ WAJIB berisi secara ringkas:
 - URUTAN BACA WAJIB (BACA DULU SEBELUM APAPUN): 07_AGENT_CONTEXT.md → 01_PRD.md → 08_TASKS.md → 09_AI_RULES.md → dokumen teknis terkait task
 - File acuan per jenis task: 02_ARCHITECTURE.md untuk arsitektur, 03_DATA_MODELS.md untuk database, 04_PROJECT_STANDARDS.md untuk coding standard, 05_DESIGN_SYSTEM.md untuk UI/UX, 06_DELIVERY.md untuk testing/deploy
 - Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
+- Urutan implementasi: Frontend dulu (UI/komponen/routing/state) → baru Backend (API/database/server logic)
+- Larangan urutan: jangan kerjakan backend sebelum skeleton UI dan komponen utamanya ada
 - Anti-halusinasi: DO NOT ASSUME ANYTHING NOT IN THESE DOCUMENTS; IF UNSURE, RE-READ 01_PRD.md FIRST
 
 ATURAN KHUSUS:
@@ -333,11 +348,16 @@ ATURAN KHUSUS:
 
 WAJIB berisi:
 - Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
-- Phase pembangunan linear dari setup sampai release
+- Phase pembangunan linear dari setup sampai release dengan urutan frontend-first: setup → UI/komponen/routing/state → integrasi API dari frontend → backend/API/database logic → integrasi penuh → testing/security/deploy
 - Task atomic dengan format tabel: ID, Phase, Goal, Dokumen Wajib Dibaca, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
 - Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
 - Aturan berhenti jika blocker muncul
 - Cara melanjutkan setelah task selesai
+
+ATURAN URUTAN WAJIB:
+- Phase FRONTEND (UI, halaman, komponen, routing, state management) HARUS dikerjakan SEBELUM phase BACKEND (API endpoint, database logic, server-side logic).
+- Alasan: memastikan UI shape, user flow, dan data contract jelas sebelum implementasi server.
+- Jangan buat task backend fungsional sebelum semua halaman utama dan komponen UI-nya sudah ada skeleton/struktur dasarnya.
 
 ATURAN KHUSUS:
 - Jangan membuat task terlalu besar.
@@ -355,9 +375,11 @@ WAJIB berisi dalam English:
 - Required reading order before coding
 - Low-context model rules
 - How to execute tasks from 08_TASKS.md
+- Frontend-First Rule: always implement UI skeleton, pages, routing, state, and components before writing backend/API/database logic. Never write an API endpoint for a feature that has no UI skeleton yet.
+- Stop-and-Ask Rule: if context is missing, unclear, contradictory, or not traceable to 01_PRD.md or referenced docs, STOP and ask the user. Never guess, invent, or continue with assumptions.
 - Zero Hallucination Rules: never assume features outside 01_PRD.md, never use libraries outside 02_ARCHITECTURE.md, never create tables/fields outside 03_DATA_MODELS.md, stop and ask if context is missing
 - Anti-Drift Rules: never refactor unrelated code, never add scope, never guess env secrets, never continue with unclear context
-- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers
+- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers, confirm Definition of Done before moving to next task
 - Ready-to-copy prompt template for another AI model
 - Recovery flow if AI errors, times out, loses context, or rate-limit happens
 - Quality checklist before a task is considered done
@@ -373,7 +395,11 @@ ATURAN KHUSUS:
       filePrompt = `Buat dokumen ${fileName} berdasarkan percakapan dan dokumen sebelumnya.`;
   }
 
-  const conversationSection = fileIndex === 0 ? `\nCONVERSATION:\n${conversation}` : '';
+  const conversationSection = fileIndex === 0
+    ? hasProjectContext
+      ? `\n${projectContext}\n\nCATATAN: Gunakan Project State sebagai sumber utama. Chat history tidak dikirim untuk menghemat konteks dan menghindari timeout.`
+      : `\nCONVERSATION:\n${conversation}`
+    : '';
   const contextModeInstruction = contextLevel === 'low'
     ? '\nMODE LOW-CONTEXT:\n- Tulis padat, tetap lengkap secara operasional.\n- Prioritaskan poin penting, tabel, dan checklist.\n- Hindari pengulangan panjang dari dokumen referensi.\n- Jika detail perlu dipecah, buat struktur task kecil yang mudah dilanjutkan.'
     : '';

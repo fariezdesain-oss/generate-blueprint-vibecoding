@@ -15,14 +15,14 @@ export const FILE_ORDER = [
 
 export const FILE_LABELS = {
   '01_PRD.md': 'Product Requirements Document',
-  '02_ARCHITECTURE.md': 'Dokumen Arsitektur',
-  '03_DATA_MODELS.md': 'Data Model',
+  '02_ARCHITECTURE.md': 'System Architecture',
+  '03_DATA_MODELS.md': 'Data Models & Database Schema',
   '04_PROJECT_STANDARDS.md': 'Project Standards',
   '05_DESIGN_SYSTEM.md': 'Design System',
-  '06_DELIVERY.md': 'Delivery Plan',
-  '07_AGENT_CONTEXT.md': 'Agent Context',
-  '08_TASKS.md': 'Task List',
-  '09_AI_RULES.md': 'AI Rules',
+  '06_DELIVERY.md': 'Testing, Security & Delivery',
+  '07_AGENT_CONTEXT.md': 'Root AI Context File',
+  '08_TASKS.md': 'Atomic Vibecoding Tasks',
+  '09_AI_RULES.md': 'AI Implementation Rules',
 };
 
 export const PLACEHOLDER_PATTERNS = [

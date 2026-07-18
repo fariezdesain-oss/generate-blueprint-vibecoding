@@ -1,0 +1,2 @@
+-- Nomor migrasi 006 sengaja dicadangkan dan dilewati.
+-- Migrasi ini tidak mengubah skema database.

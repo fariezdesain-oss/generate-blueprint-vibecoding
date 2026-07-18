@@ -50,8 +50,8 @@ export function detectModelCapabilities(providerName: string, modelName: string)
       contextLevel: 'low',
       maxTokens: 12000,
       previewLimit: 900,
-      timeoutMs: provider === 'groq' ? 90000 : 150000,
-      retryCount: 4,
+      timeoutMs: provider === 'groq' ? 120000 : 150000,
+      retryCount: 5,
       consistencyMode: 'light',
     };
   }
@@ -72,7 +72,7 @@ export function detectModelCapabilities(providerName: string, modelName: string)
     maxTokens: 20000,
     previewLimit: 1600,
     timeoutMs: 180000,
-    retryCount: 3,
+    retryCount: 4,
     consistencyMode: 'light',
   };
 }

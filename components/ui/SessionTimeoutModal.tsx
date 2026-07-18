@@ -62,8 +62,9 @@ export function SessionTimeoutModal({ timeRemaining, onStayLoggedIn }: SessionTi
             Tetap Login
           </button>
           <button
-            onClick={() => {
-              window.location.href = '/api/auth/logout';
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login';
             }}
             className="flex items-center justify-center gap-2 rounded-xl border border-subtle bg-tertiary px-4 py-2.5 text-sm text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
           >

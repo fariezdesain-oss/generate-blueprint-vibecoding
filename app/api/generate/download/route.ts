@@ -1,18 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { generateZip } from '@/lib/utils/zipGenerator';
+import { withAuth } from '@/lib/utils/apiAuth';
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const POST = withAuth(async (req) => {
   const { files } = await req.json();
 
   if (!files || typeof files !== 'object') {
@@ -38,4 +28,4 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-}
+});

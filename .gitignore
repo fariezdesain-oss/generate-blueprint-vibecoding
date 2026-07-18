@@ -8,6 +8,7 @@
 
 # testing
 /coverage
+/tests/e2e/.auth/
 
 # next.js
 /.next/
@@ -37,3 +38,9 @@ next-env.d.ts
 
 # session notes
 session-ses_*.md
+
+# build artifacts
+.next_stale_*/
+test-results/
+.playwright-mcp/
+pictures/

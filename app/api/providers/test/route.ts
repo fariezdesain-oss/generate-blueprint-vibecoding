@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
+import { withAuth } from '@/lib/utils/apiAuth';
 
 const TEST_TIMEOUT_MS = 18000;
 
@@ -19,18 +19,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   });
 }
 
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  const limited = rateLimitResponse(`${userData.user.id}:provider-test`, 10, 60_000);
+export const POST = withAuth(async (req, _context, supabase, user) => {
+  const limited = await rateLimitResponse(supabase, `${user.id}:provider-test`, 10, 60_000);
   if (limited) return limited;
 
   const body = await req.json();
@@ -47,7 +37,7 @@ export async function POST(req: Request) {
       .from('provider_configs')
       .select('*')
       .eq('id', provider_id)
-      .eq('user_id', userData.user.id)
+      .eq('user_id', user.id)
       .single();
 
     if (!config) {
@@ -117,4 +107,4 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-}
+});

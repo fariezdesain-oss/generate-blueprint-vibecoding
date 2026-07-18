@@ -6,7 +6,9 @@ import { useChatStore } from '@/store/useChatStore';
 import { ChatWindow } from '@/components/ui/ChatWindow';
 import { Send, FileText, Square } from 'lucide-react';
 import { FILE_ORDER, FILE_LABELS, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
+import { shouldContinueGeneration } from '@/lib/utils/generationControl';
 import { FilePicker } from '@/components/ui/FilePicker';
+import { ProjectStatePanel } from '@/components/ui/ProjectStatePanel';
 import type { Attachment } from '@/types/chat';
 
 export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null }) {
@@ -26,6 +28,8 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   const [filePickerKey, setFilePickerKey] = useState(0);
   const [showModePicker, setShowModePicker] = useState(false);
   const [pickingMode, setPickingMode] = useState(false);
+  const [titleInput, setTitleInput] = useState('');
+  const [pickedModeTemp, setPickedModeTemp] = useState<'docs' | 'n8n' | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
 
@@ -49,6 +53,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   const setMode = useChatStore((s) => s.setMode);
   const titleSet = useRef(false);
   const activeSessionRef = useRef<string | null>(null);
+  const justCreatedRef = useRef(false);
 
   useEffect(() => {
     if (chatError) {
@@ -94,11 +99,6 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   const switchingSession = !!sessionIdUrlParam && sessionId !== sessionIdUrlParam;
 
   useEffect(() => {
-    if (!sessionId && !sessionIdUrlParam) {
-      setShowModePicker(true);
-      return;
-    }
-
     if (sessionIdUrlParam) {
       setLoadingMessages(true);
       useChatStore.getState().reset();
@@ -155,40 +155,62 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
       router.replace(`/chat?id=${savedSessionId}`);
       return;
     }
-
-    setShowModePicker(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionIdUrlParam]);
 
-  const handleModePick = async (pickedMode: 'docs' | 'n8n') => {
-    if (pickingMode) return;
-    setPickingMode(true);
-    setMode(pickedMode);
-    setShowModePicker(false);
+  useEffect(() => {
+    if (!sessionId && !sessionIdUrlParam) {
+      setShowModePicker(true);
+    }
+  }, [sessionId, sessionIdUrlParam]);
 
-    fetch('/api/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'New Chat', mode: pickedMode }),
-    })
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success) {
-          setSessionId(json.data.session.id);
-          setSessionTitle('New Chat');
-          sessionStorage.setItem('activeSessionId', json.data.session.id);
-          useChatStore.getState().bumpSidebar();
-        } else {
-          setShowModePicker(true);
-        }
-      })
-      .catch(() => setShowModePicker(true))
-      .finally(() => setPickingMode(false));
+  const openTitleInput = (pickedMode: 'docs' | 'n8n') => {
+    setPickedModeTemp(pickedMode);
+    setMode(pickedMode);
+    setTitleInput('');
+  };
+
+  const handleModePick = async () => {
+    if (pickingMode || !pickedModeTemp) return;
+    const customTitle = titleInput.trim();
+    if (!customTitle) return;
+    setPickingMode(true);
+    setMode(pickedModeTemp);
+
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: customTitle, mode: pickedModeTemp }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        justCreatedRef.current = true;
+        titleSet.current = true;
+        setSessionId(json.data.session.id);
+        setSessionTitle(customTitle);
+        sessionStorage.setItem('activeSessionId', json.data.session.id);
+        useChatStore.getState().bumpSidebar();
+        setShowModePicker(false);
+        setPickedModeTemp(null);
+        setTitleInput('');
+      } else {
+        setShowModePicker(true);
+      }
+    } catch {
+      setShowModePicker(true);
+    } finally {
+      setPickingMode(false);
+    }
   };
 
   useEffect(() => {
     if (!sessionId || loadingMessages) return;
     if (sessionIdUrlParam && sessionId === sessionIdUrlParam) return;
+    if (justCreatedRef.current) {
+      justCreatedRef.current = false;
+      return;
+    }
     titleSet.current = false;
     activeSessionRef.current = sessionId;
     setLoadingMessages(true);
@@ -244,7 +266,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     load();
     return () => abort.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, sessionIdUrlParam, loadingMessages]);
+  }, [sessionId, sessionIdUrlParam]);
 
   const sendingRef = useRef(false);
   const lastMessageRef = useRef<{ content: string; time: number } | null>(null);
@@ -268,29 +290,11 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     setFilePickerKey((k) => k + 1);
     sendingRef.current = true;
 
-    let currentSessionId = sessionId;
+    const currentSessionId = sessionId;
     if (!currentSessionId) {
-      try {
-        const res = await fetch('/api/sessions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: 'New Chat', mode: 'docs' }),
-        });
-        const json = await res.json();
-        if (json.success) {
-          setSessionId(json.data.session.id);
-          setSessionTitle('New Chat');
-          sessionStorage.setItem('activeSessionId', json.data.session.id);
-          currentSessionId = json.data.session.id;
-          titleSet.current = false;
-        }
-      } catch {
-        // ignore
-      }
-      if (!currentSessionId) {
-        sendingRef.current = false;
-        return;
-      }
+      sendingRef.current = false;
+      setShowModePicker(true);
+      return;
     }
 
     setInput('');
@@ -298,20 +302,6 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     setStreamingContent('');
     setChatError(null);
 
-    if (!titleSet.current) {
-      titleSet.current = true;
-      const modePrefix = mode === 'n8n' ? '⚙️ ' : '📄 ';
-      const displayTitle = modePrefix + content.trim();
-      setSessionTitle(displayTitle);
-
-      await fetch('/api/sessions', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: currentSessionId, title: displayTitle }),
-      }).catch(() => {});
-
-      bumpSidebar();
-    }
 
     const tempId = crypto.randomUUID();
     addMessage({
@@ -366,6 +356,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
             }
             if (parsed.done) {
               if (parsed.title) {
+                titleSet.current = true;
                 setSessionTitle(parsed.title);
               }
               if (parsed.message) {
@@ -396,6 +387,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
       abortRef.current = null;
       sendingRef.current = false;
       bumpSidebar();
+      window.dispatchEvent(new CustomEvent('project-state-refresh'));
     }
   };
 
@@ -431,7 +423,11 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
       try {
         const res = await fetch(`/api/sessions/${sessionId}/files`);
         const json = await res.json();
-        if (!json.success) return;
+        if (!json.success) {
+          stopPolling();
+          setChatError(json?.error?.message || 'Gagal memuat status generate. Silakan coba lagi.');
+          return;
+        }
 
         if (mode === 'n8n') {
           if (json.data.n8n_workflow) {
@@ -546,7 +542,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
           setChatError(json?.error?.message || 'Gagal memulai generate. Silakan coba lagi.');
           return;
         }
-        if (!json.data?.completed && pollingActiveRef.current) {
+        if (shouldContinueGeneration(json.data) && pollingActiveRef.current) {
           setTimeout(runNext, 500);
         }
       } catch {
@@ -576,7 +572,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
           </div>
           <div className="grid grid-cols-1 gap-4 sm:gap-5 sm:grid-cols-2">
             <button
-              onClick={() => handleModePick('docs')}
+              onClick={() => openTitleInput('docs')}
               disabled={pickingMode}
               className="group relative flex flex-col items-center gap-4 sm:gap-5 rounded-2xl border border-subtle bg-primary p-4 sm:p-6 lg:p-8 text-center transition-all duration-300 hover:border-gemini-blue/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.08)] disabled:opacity-50"
             >
@@ -599,7 +595,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
               </div>
             </button>
             <button
-              onClick={() => handleModePick('n8n')}
+              onClick={() => openTitleInput('n8n')}
               disabled={pickingMode}
               className="group relative flex flex-col items-center gap-4 sm:gap-5 rounded-2xl border border-subtle bg-primary p-4 sm:p-6 lg:p-8 text-center transition-all duration-300 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.08)] disabled:opacity-50"
             >
@@ -625,6 +621,66 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
             </button>
           </div>
         </div>
+        {pickedModeTemp && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4 backdrop-blur-md">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleModePick();
+              }}
+              className="animate-fade-in-up w-full max-w-md glass rounded-3xl border border-subtle p-5 sm:p-6 shadow-2xl"
+            >
+              <div className="mb-5 flex items-center gap-3">
+                <div className={`flex size-11 shrink-0 items-center justify-center rounded-2xl ring-1 ${pickedModeTemp === 'n8n' ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20' : 'bg-gemini-blue/10 text-gemini-blue ring-gemini-blue/20'}`}>
+                  {pickedModeTemp === 'n8n' ? (
+                    <svg className="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                    </svg>
+                  ) : (
+                    <FileText className="size-5" />
+                  )}
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-primary">Beri Judul Chat</h2>
+                  <p className="mt-1 text-xs font-semibold text-tertiary">Judul wajib diisi agar riwayat mudah dikenali.</p>
+                </div>
+              </div>
+
+              <label className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-tertiary">
+                Judul sesi
+              </label>
+              <input
+                autoFocus
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                disabled={pickingMode}
+                placeholder={pickedModeTemp === 'n8n' ? 'Contoh: Workflow notifikasi Slack' : 'Contoh: Aplikasi kasir toko'}
+                className="min-h-12 w-full rounded-2xl border border-subtle bg-tertiary px-4 text-sm font-semibold text-primary outline-none transition-all duration-300 placeholder:text-tertiary focus:border-gemini-blue/40 focus:shadow-[0_0_24px_rgba(59,130,246,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+              />
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  disabled={pickingMode}
+                  onClick={() => {
+                    setPickedModeTemp(null);
+                    setTitleInput('');
+                  }}
+                  className="min-h-11 rounded-2xl border border-subtle bg-secondary px-4 text-sm font-bold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Kembali
+                </button>
+                <button
+                  type="submit"
+                  disabled={pickingMode || !titleInput.trim()}
+                  className="min-h-11 rounded-2xl btn-gradient px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:transform-none"
+                >
+                  {pickingMode ? 'Membuat...' : 'Mulai Chat'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     );
   }
@@ -741,7 +797,12 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         </div>
       )}
 
-      <ChatWindow loadingMessages={loadingMessages || switchingSession} />
+      <div className="flex flex-1 min-h-0">
+        <ChatWindow loadingMessages={loadingMessages || switchingSession} />
+        {sessionId && !switchingSession && mode === 'docs' && (
+          <ProjectStatePanel sessionId={sessionId} />
+        )}
+      </div>
 
       <div className="border-t border-subtle p-3 sm:p-6">
         <div className="mx-auto flex max-w-3xl flex-col gap-3 sm:gap-4">
@@ -788,7 +849,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                   }`}
                   title={
                     canGenerate
-                      ? mode === 'n8n' ? 'Generate n8n Workflow' : 'Generate 7 Engineering Documents'
+                      ? mode === 'n8n' ? 'Generate n8n Workflow' : 'Generate 9 Engineering Documents'
                       : 'Selesaikan dulu sesi diskusi proyek Anda'
                   }
                 >

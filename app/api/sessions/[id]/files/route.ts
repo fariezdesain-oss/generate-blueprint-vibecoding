@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
+import { withAuth } from '@/lib/utils/apiAuth';
 import { FILE_ORDER, countGeneratedSpecFiles, getNextMissingSpecFile } from '@/lib/utils/sequentialPrompts';
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const GET = withAuth(async (
+  _req,
+  { params },
+  supabase,
+  user,
+) => {
   const { data: session, error: selectError } = await supabase
     .from('sessions')
     .select('*')
@@ -29,7 +21,7 @@ export async function GET(
     );
   }
 
-  if (session.user_id !== userData.user.id) {
+  if (session.user_id !== user.id) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
@@ -89,22 +81,14 @@ export async function GET(
     success: true,
     data: result,
   });
-}
+});
 
-export async function DELETE(
-  _req: Request,
-  { params }: { params: { id: string } },
-) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
+export const DELETE = withAuth(async (
+  _req,
+  { params },
+  supabase,
+  user,
+) => {
   const { data: session } = await supabase
     .from('sessions')
     .select('user_id')
@@ -118,7 +102,7 @@ export async function DELETE(
     );
   }
 
-  if (session.user_id !== userData.user.id) {
+  if (session.user_id !== user.id) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
@@ -140,7 +124,7 @@ export async function DELETE(
       updated_at: new Date().toISOString(),
     })
     .eq('id', params.id)
-    .eq('user_id', userData.user.id);
+    .eq('user_id', user.id);
 
   if (updateError) {
     return NextResponse.json(
@@ -150,4 +134,4 @@ export async function DELETE(
   }
 
   return NextResponse.json({ success: true });
-}
+});

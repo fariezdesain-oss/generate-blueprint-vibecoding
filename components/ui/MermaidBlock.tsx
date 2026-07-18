@@ -6,10 +6,9 @@ interface MermaidBlockProps {
   code: string;
 }
 
-let mermaidLoaded = false;
-
 export function MermaidBlock({ code }: MermaidBlockProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [rendered, setRendered] = useState(false);
 
@@ -20,7 +19,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
       try {
         const mermaid = (await import('mermaid')).default;
 
-        if (!mermaidLoaded) {
+        if (!initializedRef.current) {
           mermaid.initialize({
             startOnLoad: false,
             theme: 'dark',
@@ -42,7 +41,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
             flowchart: { curve: 'basis', useMaxWidth: true },
             sequence: { useMaxWidth: true },
           });
-          mermaidLoaded = true;
+          initializedRef.current = true;
         }
 
         if (!ref.current || cancelled) return;

@@ -18,6 +18,7 @@ export default function HistoryPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState<SessionItem | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const router = useRouter();
 
   const fetchSessions = async () => {
@@ -40,21 +41,31 @@ export default function HistoryPage() {
 
   const handleDeleteClick = (s: SessionItem, e: React.MouseEvent) => {
     e.stopPropagation();
+    setDeleteError(null);
     setDeleteTarget(s);
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    const res = await fetch(`/api/sessions/${deleteTarget.id}`, { method: 'DELETE' });
-    const json = await res.json();
-    if (json.success) {
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/sessions/${deleteTarget.id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'Gagal menghapus sesi');
+
       setSessions((prev) => prev.filter((s) => s.id !== deleteTarget.id));
       useChatStore.getState().bumpSidebar();
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Gagal menghapus sesi');
     }
-    setDeleteTarget(null);
   };
 
-  const cancelDelete = () => setDeleteTarget(null);
+  const cancelDelete = () => {
+    setDeleteError(null);
+    setDeleteTarget(null);
+  };
 
   if (loading) {
     return (
@@ -73,7 +84,6 @@ export default function HistoryPage() {
         </div>
         <button
           onClick={() => {
-            useChatStore.getState().bumpNewChat();
             router.push('/chat');
           }}
           className="btn-gradient flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 lg:px-5 lg:py-2.5 text-xs sm:text-sm"
@@ -178,6 +188,11 @@ export default function HistoryPage() {
             <p className="mb-6 text-sm font-medium text-gemini-blue">
               &ldquo;{deleteTarget.title.length > 40 ? deleteTarget.title.slice(0, 40) + '...' : deleteTarget.title}&rdquo;
             </p>
+            {deleteError && (
+              <p className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">
+                {deleteError}
+              </p>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={cancelDelete}

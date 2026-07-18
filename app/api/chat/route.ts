@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import { createProvider } from '@/lib/ai/provider.factory';
 import { decrypt } from '@/lib/utils/encryption';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AIProviderConfig, ContentFile } from '@/lib/ai/provider.interface';
 import { formatAIError } from '@/lib/utils/aiErrorHandler';
 import { sanitizeChatAttachments, type ChatAttachment } from '@/lib/utils/attachments';
@@ -9,6 +10,7 @@ import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
 import { FILE_ORDER } from '@/lib/utils/sequentialPrompts';
 import { withAuth, checkOwnership } from '@/lib/utils/apiAuth';
+import { updateProjectState, updateRollingSummary } from '@/lib/utils/projectState';
 
 async function getActiveProviderConfig(userId: string): Promise<{
   providerName: string;
@@ -133,11 +135,6 @@ BEHAVIOR RULES:
 
 11. **Stay on topic** — Jika user bertanya di luar konteks workflow n8n, arahkan kembali ke kebutuhan workflow automation.`;
 
-const MODE_PREFIX: Record<string, string> = {
-  docs: '📄 ',
-  n8n: '⚙️ ',
-};
-
 function buildPrompt(messages: { role: string; content: string }[], mode: string): string {
   const systemPrompt = mode === 'n8n' ? SYSTEM_PROMPT_N8N : SYSTEM_PROMPT_DOCS;
   const systemBlock = `SYSTEM: ${systemPrompt}`;
@@ -165,6 +162,19 @@ async function loadContentFiles(files: { storagePath: string; mimeType: string; 
   }
 
   return result;
+}
+
+function scheduleProjectMemoryUpdate(
+  supabase: SupabaseClient,
+  sessionId: string,
+  aiConfig: AIProviderConfig,
+  latestContent: string,
+  messages: { role: string; content: string }[],
+) {
+  Promise.allSettled([
+    updateProjectState(supabase, sessionId, aiConfig, latestContent),
+    updateRollingSummary(supabase, sessionId, aiConfig, messages),
+  ]).catch(() => undefined);
 }
 
 export const GET = withAuth(async (
@@ -200,7 +210,7 @@ export const GET = withAuth(async (
   // Need session title/mode — re-fetch with select
   const { data: session } = await supabase
     .from('sessions')
-    .select('title, mode')
+    .select('title, mode, project_state, rolling_summary')
     .eq('id', sessionId)
     .single();
 
@@ -217,7 +227,16 @@ export const GET = withAuth(async (
     );
   }
 
-  return NextResponse.json({ success: true, data: { messages: data, title: session?.title, mode: session?.mode || 'docs' } });
+  return NextResponse.json({
+    success: true,
+    data: {
+      messages: data,
+      title: session?.title,
+      mode: session?.mode || 'docs',
+      project_state: session?.project_state || {},
+      rolling_summary: session?.rolling_summary || '',
+    },
+  });
 });
 
 export const POST = withAuth(async (
@@ -226,7 +245,7 @@ export const POST = withAuth(async (
   supabase,
   user
 ) => {
-  const limited = rateLimitResponse(`${user.id}:chat`, 30, 60_000);
+  const limited = await rateLimitResponse(supabase, `${user.id}:chat`, 30, 60_000);
   if (limited) return limited;
 
   const { session_id, content, files } = await req.json();
@@ -351,6 +370,14 @@ export const POST = withAuth(async (
         .update({ updated_at: new Date().toISOString() })
         .eq('id', session_id);
 
+      scheduleProjectMemoryUpdate(
+        supabase,
+        session_id,
+        aiConfig,
+        aiResponse,
+        [...(history || []), { role: 'assistant', content: aiResponse }],
+      );
+
       return NextResponse.json(
         { success: true, data: { message: aiMessage } },
         { status: 201 },
@@ -405,24 +432,14 @@ export const POST = withAuth(async (
             .from('sessions')
             .update({ updated_at: new Date().toISOString() })
             .eq('id', session_id);
-        }
 
-        let sessionTitle: string | undefined;
-        if (session?.title === 'New Chat') {
-          try {
-            const firstFileName = userAttachments.length > 0 ? userAttachments[0].name : '';
-            const titleSource = (content || firstFileName || 'New Chat');
-            const raw = titleSource.length > 35 ? titleSource.substring(0, 35) + '...' : titleSource;
-            const mode = session?.mode || 'docs';
-            const prefix = MODE_PREFIX[mode] || '';
-            sessionTitle = prefix + (mode === 'n8n' ? raw : raw);
-            await supabase
-              .from('sessions')
-              .update({ title: sessionTitle, updated_at: new Date().toISOString() })
-              .eq('id', session_id);
-          } catch {
-            sessionTitle = undefined;
-          }
+          scheduleProjectMemoryUpdate(
+            supabase,
+            session_id,
+            aiConfig,
+            fullResponse,
+            [...(history || []), { role: 'assistant', content: fullResponse }],
+          );
         }
 
         const messageData = inserted
@@ -437,7 +454,7 @@ export const POST = withAuth(async (
 
         controller.enqueue(
           encoder.encode(
-            JSON.stringify({ done: true, message: messageData, title: sessionTitle }) + '\n',
+            JSON.stringify({ done: true, message: messageData }) + '\n',
           ),
         );
         controller.close();

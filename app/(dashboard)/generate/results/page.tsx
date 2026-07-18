@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Copy, Download, FileText, Archive, RefreshCw, Sparkles, ChevronDown, Workflow } from 'lucide-react';
@@ -32,7 +32,7 @@ interface N8nData {
   setup_instructions?: string;
 }
 
-export default function GenerateResultsPage() {
+function GenerateResultsContent() {
   const [data, setData] = useState<GenerateData | null>(null);
   const [n8nData, setN8nData] = useState<N8nData | null>(null);
   const [activeFile, setActiveFile] = useState(FILE_ORDER[0]);
@@ -41,6 +41,7 @@ export default function GenerateResultsPage() {
   const [regenerating, setRegenerating] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(true);
   const [n8nTab, setN8nTab] = useState<'json' | 'setup'>('json');
+  const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,8 +56,9 @@ export default function GenerateResultsPage() {
     }
 
     setLoading(true);
+    setError(null);
 
-    if (isN8n) {
+  if (isN8n) {
       try {
         const res = await fetch(`/api/sessions/${sessionId}/files`);
         if (res.ok) {
@@ -72,10 +74,10 @@ export default function GenerateResultsPage() {
             return;
           }
         }
-      } catch {
-        // ignore
-      }
-      setLoading(false);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Gagal memuat workflow n8n');
+        }
+        setLoading(false);
       return;
     }
 
@@ -89,8 +91,8 @@ export default function GenerateResultsPage() {
           return;
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal memuat dokumen');
     }
 
     const raw = sessionStorage.getItem(`generateResult_${sessionId}`);
@@ -102,8 +104,8 @@ export default function GenerateResultsPage() {
           setLoading(false);
           return;
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Data hasil generate lokal tidak valid');
       }
     }
 
@@ -159,6 +161,7 @@ export default function GenerateResultsPage() {
     if (fileIndex === -1) return;
 
     setRegenerating(fileName);
+    setError(null);
 
     try {
       const res = await fetch('/api/generate/sequential', {
@@ -170,9 +173,11 @@ export default function GenerateResultsPage() {
       const json = await res.json();
       if (json.success) {
         await loadFiles();
+      } else {
+        setError(json.error?.message || 'Gagal regenerate dokumen');
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gagal regenerate dokumen');
     } finally {
       setRegenerating(null);
     }
@@ -182,6 +187,20 @@ export default function GenerateResultsPage() {
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="size-5 sm:size-6 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+      </div>
+    );
+  }
+
+  if (error && !data && !n8nData) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 px-4 text-center">
+        <p className="text-sm sm:text-lg text-red-400">{error}</p>
+        <button
+          onClick={() => router.push('/chat')}
+          className="btn-gradient px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-sm"
+        >
+          Kembali ke Chat
+        </button>
       </div>
     );
   }
@@ -462,5 +481,17 @@ export default function GenerateResultsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function GenerateResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-primary text-secondary">
+        Memuat...
+      </div>
+    }>
+      <GenerateResultsContent />
+    </Suspense>
   );
 }

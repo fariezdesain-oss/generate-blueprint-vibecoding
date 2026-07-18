@@ -5,6 +5,9 @@ import { buildN8nPrompt } from '@/lib/utils/n8nPrompt';
 import { validateN8nWorkflow } from '@/lib/utils/n8nValidator';
 import type { ProviderFallbackCandidate } from '@/lib/utils/providerFallback';
 import { isFallbackableAIError } from '@/lib/utils/providerFallback';
+import { updateSessionWithRetry } from '@/lib/utils/generationDb';
+import { hasPlaceholder } from '@/lib/utils/docQuality';
+import { autoFixWorkflow, extractJson } from '@/lib/utils/workflowJson';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface GenerationProgress {
@@ -50,6 +53,13 @@ async function updateGenerationProgress(
   }
 }
 
+function getPreviewLimit(config: AIProviderConfig): number {
+  if (typeof config.previewLimit === 'number') return config.previewLimit;
+  if (config.contextLevel === 'low') return 900;
+  if (config.contextLevel === 'medium') return 1600;
+  return 3000;
+}
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   const timeoutPromise = new Promise<T>((_, reject) => {
@@ -58,42 +68,53 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): P
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!));
 }
 
-async function updateSessionWithRetry(
-  supabase: SupabaseClient,
-  sessionId: string,
-  userId: string,
-  updateData: Record<string, unknown>,
-): Promise<void> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', sessionId)
-      .eq('user_id', userId);
-
-    if (!error) return;
-    lastError = error;
-    await new Promise(r => setTimeout(r, 1000));
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Failed to update session');
-}
-
 export async function retryAI(
   provider: AIProvider,
   prompt: string,
   _config: AIProviderConfig,
   maxAttempts: number = _config.retryCount || 3,
   timeoutMs: number = _config.timeoutMs || 120000,
+  onChunk?: (_chunk: string, _total: string) => void,
 ): Promise<string> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const rawResponse = await withTimeout(provider.generateChat(prompt, _config), _config.timeoutMs || timeoutMs, 'AI generateChat');
-      const response = String(rawResponse || '');
-      if (!response.trim()) throw new Error('AI empty response');
-      return response;
+      if (typeof provider.streamChat === 'function') {
+        let fullResponse = '';
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let isDone = false;
+
+        const streamPromise = (async () => {
+          try {
+            const gen = provider.streamChat(prompt, _config);
+            for await (const token of gen) {
+              if (timer) clearTimeout(timer); // reset idle timer on chunk
+              fullResponse += token;
+              if (onChunk) onChunk(token, fullResponse);
+              timer = setTimeout(() => {
+                if (!isDone) throw new Error(`Timeout after ${timeoutMs / 1000}s idle stream: AI streamChat`);
+              }, timeoutMs);
+            }
+          } finally {
+            isDone = true;
+            if (timer) clearTimeout(timer);
+          }
+        })();
+
+        // Start initial timer
+        timer = setTimeout(() => {
+          if (!isDone) throw new Error(`Timeout after ${timeoutMs / 1000}s idle stream: AI streamChat`);
+        }, timeoutMs);
+
+        await streamPromise;
+
+        if (!fullResponse.trim()) throw new Error('AI empty response');
+        return fullResponse;
+      } else {
+        const rawResponse = await withTimeout(provider.generateChat(prompt, _config), timeoutMs, 'AI generateChat');
+        const response = String(rawResponse || '');
+        if (!response.trim()) throw new Error('AI empty response');
+        return response;
+      }
     } catch (err: any) {
       if (attempt < maxAttempts - 1) {
         const msg = err?.message || '';
@@ -113,6 +134,7 @@ export async function generateWithProviderFallback(
   candidates: ProviderFallbackCandidate[],
   buildPromptForConfig: (_config: AIProviderConfig) => string,
   maxAttemptsOverride?: number,
+  onChunk?: (_chunk: string, _total: string) => void,
 ): Promise<{ response: string; config: AIProviderConfig; usedFallback: boolean }> {
   let lastError: unknown;
 
@@ -121,7 +143,14 @@ export async function generateWithProviderFallback(
     const prompt = buildPromptForConfig(candidate.config);
 
     try {
-      const response = await retryAI(provider, prompt, candidate.config, maxAttemptsOverride ?? candidate.config.retryCount ?? 3);
+      const response = await retryAI(
+        provider,
+        prompt,
+        candidate.config,
+        maxAttemptsOverride ?? candidate.config.retryCount ?? 3,
+        undefined,
+        onChunk
+      );
       return { response, config: candidate.config, usedFallback: !candidate.isPrimary };
     } catch (err) {
       lastError = err;
@@ -143,7 +172,7 @@ export async function processSequential(
 ): Promise<{ completed: boolean; generatedCount: number; totalFiles: number; nextFile: string }> {
   const { data: session } = await supabase
     .from('sessions')
-    .select('generated_files')
+    .select('generated_files, project_state, rolling_summary')
     .eq('id', sessionId)
     .eq('user_id', userId)
     .single();
@@ -175,23 +204,35 @@ export async function processSequential(
 
     await pushProgress(i, fileName, 0, 'preparing', `Menganalisis konteks untuk ${fileLabel}...`);
     const buildPromptForConfig = (config: AIProviderConfig) => {
-      const previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (config.previewLimit ?? 2000) : 0;
-      return buildFilePrompt(i, messages, existingFiles, previewLimit, config.contextLevel || 'high');
+      const previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? getPreviewLimit(config) : 0;
+      return buildFilePrompt(
+        i,
+        messages,
+        existingFiles,
+        previewLimit,
+        config.contextLevel || 'high',
+        session?.project_state as Record<string, unknown>,
+        session?.rolling_summary as string,
+      );
     };
 
     await pushProgress(i, fileName, 25, 'generating', `Menulis ${fileLabel}...`);
-    let result = await generateWithProviderFallback(candidates, buildPromptForConfig);
+    let lastProgressUpdate = Date.now();
+    let result = await generateWithProviderFallback(candidates, buildPromptForConfig, undefined, (chunk, total) => {
+      // Throttle DB updates during stream to avoid overwhelming Supabase
+      if (Date.now() - lastProgressUpdate > 3000) {
+        lastProgressUpdate = Date.now();
+        // Estimated completion percentage based on typical doc sizes
+        const estTotal = 4000;
+        const subProgress = Math.min(40, Math.round((total.length / estTotal) * 40));
+        pushProgress(i, fileName, 25 + subProgress, 'generating', `Menulis ${fileLabel}... (${total.length} chars)`);
+      }
+    });
     let aiResponse = result.response;
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
     await pushProgress(i, fileName, 70, 'generating', `Memeriksa kualitas ${fileLabel}...`);
-    const placeholderPatterns = [
-      /TODO/i, /TBD/i, /placeholder/i,
-      /sesuaikan\s+dengan\s+kebutuhan/i, /ganti\s+dengan/i,
-      /ubah\s+sesuai/i, /isi\s+dengan/i,
-      /contoh:\s*\w+/i, /misalnya:?\s*\w+/i,
-    ];
-    if (placeholderPatterns.some(p => p.test(fileContent))) {
+    if (hasPlaceholder(fileContent)) {
       await pushProgress(i, fileName, 80, 'fixing_placeholders', `Memperbaiki placeholder di ${fileLabel}...`);
       const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder. HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP.`;
       result = await generateWithProviderFallback(candidates, () => correctionPrompt, 2);
@@ -301,83 +342,6 @@ export async function processSequential(
   await updateSessionWithRetry(supabase, sessionId, userId, { generated_at: new Date().toISOString(), updated_at: new Date().toISOString() });
 
   return { completed: true, generatedCount: FILE_ORDER.length, totalFiles: FILE_ORDER.length, nextFile: '' };
-}
-
-function extractJson(text: string): string | null {
-  const start = text.indexOf('{');
-  if (start === -1) return null;
-  let depth = 0, inString = false, escape = false;
-  for (let i = start; i < text.length; i++) {
-    const ch = text[i];
-    if (escape) { escape = false; continue; }
-    if (ch === '\\' && inString) { escape = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') depth++;
-    else if (ch === '}') depth--;
-    if (depth === 0) return text.slice(start, i + 1);
-  }
-  return null;
-}
-
-function generateId(): string {
-  return 'node-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
-}
-
-function autoFixWorkflow(workflow: Record<string, unknown>): { workflow: Record<string, unknown>; fixes: string[] } {
-  const fixes: string[] = [];
-  const nodes = workflow.nodes as Array<Record<string, unknown>> | undefined;
-  if (!nodes) return { workflow, fixes };
-
-  const hasWebhook = nodes.some(n => n.type === 'n8n-nodes-base.webhook');
-  const hasRespond = nodes.some(n => n.type === 'n8n-nodes-base.respondToWebhook');
-
-  if (hasWebhook && !hasRespond) {
-    const webhookNode = nodes.find(n => n.type === 'n8n-nodes-base.webhook');
-    const webhookName = (webhookNode?.name as string) || 'Webhook';
-    const respondId = generateId();
-    const respondNode = {
-      id: respondId,
-      name: 'Balas Webhook',
-      type: 'n8n-nodes-base.respondToWebhook',
-      typeVersion: 1,
-      position: [250, 300],
-      parameters: { respondWith: 'json', options: {} },
-    };
-
-    const lastNode = nodes[nodes.length - 1];
-    const lastX = ((lastNode?.position as number[])?.[0] || 250) + 250;
-    respondNode.position = [lastX, 300];
-    nodes.push(respondNode);
-
-    let connections = workflow.connections as Record<string, unknown> | undefined;
-    if (!connections) connections = {};
-    const c = connections;
-    const webhookConns = c[webhookName] as Array<Array<Record<string, unknown>>> | undefined;
-    if (webhookConns && webhookConns.length > 0) {
-      const firstTarget = webhookConns[0]?.[0]?.node;
-      if (firstTarget) {
-        c[respondNode.name] = [[{ node: firstTarget, type: 'main', index: 0 }]];
-        webhookConns[0] = [{ node: respondNode.name, type: 'main', index: 0 }];
-      }
-    }
-    workflow.connections = c;
-    fixes.push('Auto-fix: Menambahkan Respond to Webhook node');
-  }
-
-  for (const node of nodes) {
-    if (!node.id || node.id === '') {
-      node.id = generateId();
-      fixes.push(`Auto-fix: Mengisi ID untuk node "${node.name}"`);
-    }
-    if (node.typeVersion === undefined || node.typeVersion === null) {
-      const typeStr = (node.type as string) || '';
-      node.typeVersion = typeStr.includes('webhook') || typeStr.includes('httpRequest') || typeStr.includes('set') ? 2 : 1;
-      fixes.push(`Auto-fix: Mengisi typeVersion untuk node "${node.name}"`);
-    }
-  }
-
-  return { workflow, fixes };
 }
 
 export async function processN8nSync(

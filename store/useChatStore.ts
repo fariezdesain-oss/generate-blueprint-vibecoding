@@ -12,7 +12,6 @@ interface ChatState {
   chatError: string | null;
   sidebarVersion: number;
   canGenerate: boolean;
-  newChatVersion: number;
   mode: GenerationMode;
 
   setSessionId: (id: string | null) => void;
@@ -25,7 +24,6 @@ interface ChatState {
   setChatError: (error: string | null) => void;
   bumpSidebar: () => void;
   setCanGenerate: (value: boolean) => void;
-  bumpNewChat: () => void;
   setMode: (mode: GenerationMode) => void;
   reset: () => void;
 }
@@ -39,7 +37,6 @@ export const useChatStore = create<ChatState>((set) => ({
   chatError: null,
   sidebarVersion: 0,
   canGenerate: false,
-  newChatVersion: 0,
   mode: 'docs',
 
   setSessionId: (id) => set({ sessionId: id }),
@@ -54,7 +51,6 @@ export const useChatStore = create<ChatState>((set) => ({
   setChatError: (error) => set({ chatError: error }),
   bumpSidebar: () => set((s) => ({ sidebarVersion: s.sidebarVersion + 1 })),
   setCanGenerate: (value) => set({ canGenerate: value }),
-  bumpNewChat: () => set((s) => ({ newChatVersion: s.newChatVersion + 1 })),
   setMode: (mode) => set({ mode }),
   reset: () =>
     set({
@@ -66,7 +62,6 @@ export const useChatStore = create<ChatState>((set) => ({
       chatError: null,
       sidebarVersion: 0,
       canGenerate: false,
-      newChatVersion: 0,
-      mode: 'docs',
+          mode: 'docs',
     }),
 }));

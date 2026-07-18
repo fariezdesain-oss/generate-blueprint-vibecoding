@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/db/supabaseServerClient';
 import { decrypt } from '@/lib/utils/encryption';
 import type { AIProviderConfig } from '@/lib/ai/provider.interface';
 import { buildFilePrompt, buildSingleFileConsistencyPrompt, FILE_ORDER, hasAllSpecFiles } from '@/lib/utils/sequentialPrompts';
@@ -8,43 +7,12 @@ import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { buildProviderFallbackCandidates } from '@/lib/utils/providerFallback';
 import { generateWithProviderFallback } from '@/lib/utils/generate';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { withAuth } from '@/lib/utils/apiAuth';
+import { updateSessionWithRetry } from '@/lib/utils/generationDb';
+import { hasPlaceholder } from '@/lib/utils/docQuality';
 
-async function updateSessionWithRetry(
-  supabase: SupabaseClient,
-  sessionId: string,
-  userId: string,
-  updateData: Record<string, unknown>,
-): Promise<void> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const { error } = await supabase
-      .from('sessions')
-      .update(updateData)
-      .eq('id', sessionId)
-      .eq('user_id', userId);
-
-    if (!error) return;
-    lastError = error;
-    await new Promise(r => setTimeout(r, 1000));
-  }
-
-  throw lastError instanceof Error ? lastError : new Error('Failed to update session');
-}
-
-export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-
-  if (!userData.user) {
-    return NextResponse.json(
-      { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
-      { status: 401 },
-    );
-  }
-
-  const limited = rateLimitResponse(`${userData.user.id}:generate`, 20, 10 * 60_000);
+export const POST = withAuth(async (req, _context, supabase, user) => {
+  const limited = await rateLimitResponse(supabase, `${user.id}:generate`, 20, 10 * 60_000);
   if (limited) return limited;
 
   const { session_id, file_index, preview_limit } = await req.json();
@@ -58,7 +26,7 @@ export async function POST(req: Request) {
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('user_id, generated_files')
+    .select('user_id, generated_files, project_state, rolling_summary')
     .eq('id', session_id)
     .single();
 
@@ -69,7 +37,7 @@ export async function POST(req: Request) {
     );
   }
 
-  if (session.user_id !== userData.user.id) {
+  if (session.user_id !== user.id) {
     return NextResponse.json(
       { success: false, error: { code: 'AUTH_FORBIDDEN', message: 'Forbidden' } },
       { status: 403 },
@@ -94,7 +62,7 @@ export async function POST(req: Request) {
   const { data: providerConfigs } = await supabase
     .from('provider_configs')
     .select('id, provider_name, model_name, api_key, base_url, is_active, created_at')
-    .eq('user_id', userData.user.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: true });
 
   const providerConfig = providerConfigs?.find((config) => config.is_active) || providerConfigs?.[0];
@@ -137,6 +105,8 @@ export async function POST(req: Request) {
       filesForContext,
       preview_limit ?? config.previewLimit ?? 0,
       config.contextLevel || 'high',
+      session.project_state as Record<string, unknown>,
+      session.rolling_summary as string,
     );
 
     const initialPrompt = buildPromptForConfig(aiConfig);
@@ -160,16 +130,8 @@ export async function POST(req: Request) {
 
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
-    const placeholderPatterns = [
-      /TODO/i, /TBD/i, /placeholder/i,
-      /sesuaikan\s+dengan\s+kebutuhan/i,
-      /ganti\s+dengan/i, /ubah\s+sesuai/i,
-      /isi\s+dengan/i, /contoh:\s*\w+/i,
-      /misalnya:?\s*\w+/i,
-    ];
-
-    const hasPlaceholder = placeholderPatterns.some(p => p.test(fileContent));
-    if (hasPlaceholder) {
+    const hasPlaceholderContent = hasPlaceholder(fileContent);
+    if (hasPlaceholderContent) {
       const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
       result = await generateWithProviderFallback(fallbackCandidates, () => correctionPrompt, 2);
       aiResponse = result.response;
@@ -190,6 +152,7 @@ export async function POST(req: Request) {
             if (response.includes(fileName)) {
               fileContent = `# ${fileName}\n\n${response.replace(/^#\s*.*\n/, '').trim()}`;
             }
+
             break;
           } catch {
             if (attempt === 0) continue;
@@ -209,7 +172,7 @@ export async function POST(req: Request) {
     }
 
     try {
-      await updateSessionWithRetry(supabase, session_id, userData.user.id, updateData);
+      await updateSessionWithRetry(supabase, session_id, user.id, updateData);
     } catch {
       return NextResponse.json(
         { success: false, error: { code: 'DB_SAVE_FAILED', message: 'Gagal menyimpan dokumen. Silakan coba lagi.' } },
@@ -236,4 +199,4 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-}
+});

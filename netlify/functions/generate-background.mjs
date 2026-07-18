@@ -1,7 +1,7 @@
 // Netlify background function for long-running doc/n8n generation.
 // ponytail: orchestration only — shared logic lives in ../shared/.
 import { createClient } from '@supabase/supabase-js';
-import { FILE_ORDER } from '../shared/constants.mjs';
+import { FILE_ORDER, FILE_LABELS } from '../shared/constants.mjs';
 import { extractJson, generateId, autoFixWorkflow, validateN8nWorkflow } from '../shared/utils.mjs';
 import {
   decrypt, detectModelCapabilities, isFallbackableAIError,
@@ -30,6 +30,33 @@ async function updateSessionWithRetry(supabase, sessionId, updateData) {
   throw lastError || new Error('Failed to update session');
 }
 
+async function updateGenerationProgress(supabase, sessionId, progress) {
+  try {
+    await supabase
+      .from('sessions')
+      .update({ generation_progress: progress, updated_at: new Date().toISOString() })
+      .eq('id', sessionId);
+  } catch {}
+}
+
+function getPreviewLimit(config) {
+  if (typeof config.previewLimit === 'number') return config.previewLimit;
+  if (config.contextLevel === 'low') return 900;
+  if (config.contextLevel === 'medium') return 1600;
+  return 3000;
+}
+
+function buildProgress(fileIndex, fileName, fileProgress, stage, message) {
+  return {
+    currentFileIndex: fileIndex,
+    currentFileName: fileName,
+    currentFileProgress: fileProgress,
+    overallProgress: Math.round(((fileIndex + fileProgress / 100) / FILE_ORDER.length) * 100),
+    stage,
+    message,
+  };
+}
+
 function formatConversation(messages) {
   return messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join('\n\n');
 }
@@ -46,8 +73,8 @@ function formatOtherFiles(files, previewLimit) {
     .filter(name => name !== '01_PRD.md' && files[name])
     .map(name => {
     const content = files[name];
-    const text = previewLimit > 0 && content.length > previewLimit
-      ? content.slice(0, previewLimit) + '\n\n... [dokumen dipotong untuk menghemat konteks]'
+    const text = previewLimit > 0
+      ? extractDocumentSummary(content, previewLimit)
       : content;
     return `--- ${name} (REFERENSI) ---\n${text}`;
   }).join('\n\n');
@@ -62,7 +89,8 @@ ATURAN KUALITAS:
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
 5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".
 6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md. Jika ada konflik, 01_PRD.md selalu menang.
-7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi.`;
+7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi. Jika informasi tidak ada: BERHENTI dan minta klarifikasi. JANGAN mengisi dengan asumsi. JANGAN melanjutkan dengan konteks yang tidak jelas. Setiap klaim teknis harus bisa ditelusuri ke percakapan user atau dokumen sebelumnya.
+8. URUTAN IMPLEMENTASI - 08_TASKS.md WAJIB menyusun phase dengan urutan: FASE 1 setup dan konfigurasi awal proyek; FASE 2 desain dan implementasi UI (halaman, komponen, routing, state); FASE 3 integrasi API/backend dari sisi frontend (fetch, form, auth flow di UI); FASE 4 backend/API logic (endpoint, database, business logic); FASE 5 integrasi penuh frontend-backend; FASE 6 testing, security, deployment. AI implementer WAJIB mengerjakan FASE 2 sebelum FASE 4.`;
 
 function buildConsistencyPrompt(files) {
   const prdContent = files ? files['01_PRD.md'] : null;
@@ -84,7 +112,9 @@ ${prdContent}
 `;
 
   for (const name of FILE_ORDER.filter(fileName => fileName !== '01_PRD.md')) {
-    if (files[name]) prompt += `\n--- ${name} ---\n${files[name]}\n`;
+    if (files[name]) {
+      prompt += `\n--- ${name} (RINGKASAN) ---\n${extractDocumentSummary(files[name], 1000)}\n`;
+    }
   }
 
   prompt += `\nSETELAH memeriksa, jika SEMUA KONSISTEN balas "SEMUA KONSISTEN". Jika ada kontradiksi, keluarkan ULANG hanya file bermasalah LENGKAP dengan perbaikan, diawali dengan "# NAMAFILE.md".`;
@@ -92,18 +122,89 @@ ${prdContent}
   return prompt;
 }
 
+// ponytail: keep in sync with docSummary.ts extractDocumentSummary
+function extractDocumentSummary(content, maxChars) {
+  if (!content) return '';
+  if (content.length <= maxChars) return content;
+
+  const lines = content.split('\n');
+  const extractedLines = [];
+  let currentLength = 0;
+  let inCodeBlock = false;
+  let paragraphLinesAdded = 0;
+
+  for (const line of lines) {
+    if (line.startsWith('\`\`\`')) inCodeBlock = !inCodeBlock;
+
+    const isHeading = line.startsWith('#');
+    const isEmpty = line.trim() === '';
+
+    if (isHeading) {
+      paragraphLinesAdded = 0;
+      extractedLines.push(line);
+      currentLength += line.length + 1;
+    } else if (!isEmpty && !inCodeBlock && paragraphLinesAdded < 3) {
+      extractedLines.push(line);
+      currentLength += line.length + 1;
+      paragraphLinesAdded++;
+    }
+
+    if (currentLength >= maxChars * 0.8) break;
+  }
+
+  const remainingTarget = maxChars - currentLength;
+  if (remainingTarget > 100) {
+    const tail = content.slice(-remainingTarget);
+    return extractedLines.join('\n') + '\n\n... [potongan] ...\n\n' + tail;
+  }
+
+  return extractedLines.join('\n') + '\n\n... [dokumen dipotong untuk menghemat konteks]';
+}
+
 // ponytail: buildDocPrompt parallels sequentialPrompts.ts buildFilePrompt — keep in sync.
-function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit, contextLevel = 'high') {
+function buildDocPrompt(fileIndex, messages, previousFiles, previewLimit, contextLevel = 'high', projectState, rollingSummary) {
   const fileName = FILE_ORDER[fileIndex];
+  
+  function isPlainObject(value) {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+  
+  function isProjectStateUseful(state) {
+    if (!isPlainObject(state)) return false;
+    return Object.values(state).some(value => {
+      if (Array.isArray(value)) return value.length > 0;
+      if (isPlainObject(value)) return isProjectStateUseful(value);
+      return typeof value === 'string' ? value.trim().length > 0 : value !== null && value !== undefined;
+    });
+  }
+  
+  function buildProjectContext(state, summary) {
+    const sections = [];
+    if (isProjectStateUseful(state)) {
+      sections.push(`PROJECT STATE (SUMBER KEBENARAN TERSTRUKTUR):\n${JSON.stringify(state, null, 2)}`);
+    }
+    if (summary?.trim()) {
+      sections.push(`ROLLING SUMMARY (RINGKASAN PERCAKAPAN):\n${summary.trim()}`);
+    }
+    return sections.join('\n\n');
+  }
+
+  const projectContext = buildProjectContext(projectState, rollingSummary);
+  const hasProjectContext = isProjectStateUseful(projectState) || !!rollingSummary?.trim();
+
   const conversation = formatConversation(messages);
   const prdSection = formatPRDFull(previousFiles);
   const otherSection = formatOtherFiles(previousFiles, previewLimit);
+  const isPrdVeryLong = prdSection.length > 8000;
 
   let contextSection = '';
   if (prdSection || otherSection) {
     contextSection = '\n\nREFERENSI DOKUMEN SEBELUMNYA:\n\n';
     if (prdSection) contextSection += prdSection + '\n';
     if (otherSection) contextSection += '\n' + otherSection;
+    if (isPrdVeryLong) {
+      contextSection += '\n\n[CATATAN: PRD di atas sangat lengkap. Fokus pada informasi yang RELEVAN untuk dokumen ini saja. Hindari mengulang semua detail PRD — cukup referensikan jika diperlukan.]';
+    }
   }
 
   let filePrompt = '';
@@ -255,6 +356,8 @@ WAJIB berisi secara ringkas:
 - URUTAN BACA WAJIB (BACA DULU SEBELUM APAPUN): 07_AGENT_CONTEXT.md → 01_PRD.md → 08_TASKS.md → 09_AI_RULES.md → dokumen teknis terkait task
 - File acuan per jenis task: 02_ARCHITECTURE.md untuk arsitektur, 03_DATA_MODELS.md untuk database, 04_PROJECT_STANDARDS.md untuk coding standard, 05_DESIGN_SYSTEM.md untuk UI/UX, 06_DELIVERY.md untuk testing/deploy
 - Rujukan implementasi: mulai dari 08_TASKS.md dan patuhi 09_AI_RULES.md
+- Urutan implementasi: Frontend dulu (UI/komponen/routing/state) → baru Backend (API/database/server logic)
+- Larangan urutan: jangan kerjakan backend sebelum skeleton UI dan komponen utamanya ada
 - Anti-halusinasi: DO NOT ASSUME ANYTHING NOT IN THESE DOCUMENTS; IF UNSURE, RE-READ 01_PRD.md FIRST
 
 ATURAN KHUSUS:
@@ -270,11 +373,16 @@ ATURAN KHUSUS:
 
 WAJIB berisi:
 - Prinsip penggunaan task: kerjakan berurutan, satu task per sesi AI jika model terbatas
-- Phase pembangunan linear dari setup sampai release
+- Phase pembangunan linear dari setup sampai release dengan urutan frontend-first: setup → UI/komponen/routing/state → integrasi API dari frontend → backend/API/database logic → integrasi penuh → testing/security/deploy
 - Task atomic dengan format tabel: ID, Phase, Goal, Dokumen Wajib Dibaca, Input Dokumen Acuan, Instruksi Untuk AI, Expected Output, Definition of Done, Test/Check Command, Depends On
 - Tiap task harus kecil, spesifik, dan bisa dikerjakan tanpa membaca semua dokumen sekaligus
 - Aturan berhenti jika blocker muncul
 - Cara melanjutkan setelah task selesai
+
+ATURAN URUTAN WAJIB:
+- Phase FRONTEND (UI, halaman, komponen, routing, state management) HARUS dikerjakan SEBELUM phase BACKEND (API endpoint, database logic, server-side logic).
+- Alasan: memastikan UI shape, user flow, dan data contract jelas sebelum implementasi server.
+- Jangan buat task backend fungsional sebelum semua halaman utama dan komponen UI-nya sudah ada skeleton/struktur dasarnya.
 
 ATURAN KHUSUS:
 - Jangan membuat task terlalu besar.
@@ -292,9 +400,11 @@ WAJIB berisi dalam English:
 - Required reading order before coding
 - Low-context model rules
 - How to execute tasks from 08_TASKS.md
+- Frontend-First Rule: always implement UI skeleton, pages, routing, state, and components before writing backend/API/database logic. Never write an API endpoint for a feature that has no UI skeleton yet.
+- Stop-and-Ask Rule: if context is missing, unclear, contradictory, or not traceable to 01_PRD.md or referenced docs, STOP and ask the user. Never guess, invent, or continue with assumptions.
 - Zero Hallucination Rules: never assume features outside 01_PRD.md, never use libraries outside 02_ARCHITECTURE.md, never create tables/fields outside 03_DATA_MODELS.md, stop and ask if context is missing
 - Anti-Drift Rules: never refactor unrelated code, never add scope, never guess env secrets, never continue with unclear context
-- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers
+- Duties: short plan first, small edits, run task-specific tests, report changed files, report blockers, confirm Definition of Done before moving to next task
 - Ready-to-copy prompt template for another AI model
 - Recovery flow if AI errors, times out, loses context, or rate-limit happens
 - Quality checklist before a task is considered done
@@ -311,7 +421,9 @@ ATURAN KHUSUS:
   }
 
   const conversationSection = fileIndex === 0
-    ? `\nCONVERSATION:\n${conversation}`
+    ? hasProjectContext
+      ? `\n${projectContext}\n\nCATATAN: Gunakan Project State sebagai sumber utama. Chat history tidak dikirim untuk menghemat konteks dan menghindari timeout.`
+      : `\nCONVERSATION:\n${conversation}`
     : '';
   const contextModeInstruction = contextLevel === 'low'
     ? '\nMODE LOW-CONTEXT:\n- Tulis padat, tetap lengkap secara operasional.\n- Prioritaskan poin penting, tabel, dan checklist.\n- Hindari pengulangan panjang dari dokumen referensi.\n- Jika detail perlu dipecah, buat struktur task kecil yang mudah dilanjutkan.'
@@ -414,28 +526,45 @@ PERCAKAPAN USER
 async function generateDocs(supabase, sessionId, messages, config, fallbackCandidates) {
   const { data: session } = await supabase
     .from('sessions')
-    .select('generated_files')
+    .select('generated_files, project_state, rolling_summary')
     .eq('id', sessionId)
     .single();
 
   let existingFiles = (session?.generated_files || {});
-  let previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (config.previewLimit || 2000) : 0;
+
+  const pushProgress = async (i, fileName, progress, stage, message) => {
+    await updateGenerationProgress(supabase, sessionId, buildProgress(i, fileName, progress, stage, message));
+  };
 
   for (let i = 0; i < FILE_ORDER.length; i++) {
     const fileName = FILE_ORDER[i];
 
     if (existingFiles[fileName]) continue;
 
+    const fileLabel = FILE_LABELS[fileName] || fileName;
+    await pushProgress(i, fileName, 0, 'preparing', `Menganalisis konteks untuk ${fileLabel}...`);
+
     const candidates = fallbackCandidates && fallbackCandidates.length ? fallbackCandidates : [{ id: 'primary', config, isPrimary: true }];
     const buildPromptForConfig = candidateConfig => {
-      const candidatePreviewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? (candidateConfig.previewLimit || previewLimit || 2000) : 0;
-      return buildDocPrompt(i, messages, existingFiles, candidatePreviewLimit, candidateConfig.contextLevel || 'high');
+      const candidatePreviewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? getPreviewLimit(candidateConfig) : 0;
+      return buildDocPrompt(
+        i,
+        messages,
+        existingFiles,
+        candidatePreviewLimit,
+        candidateConfig.contextLevel || 'high',
+        session?.project_state,
+        session?.rolling_summary
+      );
     };
 
+    await pushProgress(i, fileName, 25, 'generating', `Menulis ${fileLabel}...`);
     let result = await generateWithProviderFallback(candidates, buildPromptForConfig);
     let aiResponse = result.response;
 
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
+
+    await pushProgress(i, fileName, 70, 'generating', `Memeriksa kualitas ${fileLabel}...`);
 
     const placeholderPatterns = [
       /TODO/i, /TBD/i, /placeholder/i,
@@ -447,12 +576,14 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
     const hasPlaceholder = placeholderPatterns.some(p => p.test(fileContent));
 
     if (hasPlaceholder) {
+      await pushProgress(i, fileName, 80, 'fixing_placeholders', `Memperbaiki placeholder di ${fileLabel}...`);
       const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder (TODO, "sesuaikan", "ganti dengan", dll). HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP. Jangan gunakan kata "TODO", "sesuaikan", "ganti dengan", "contoh", atau "misalnya".`;
       result = await generateWithProviderFallback(candidates, () => correctionPrompt, 2);
       aiResponse = result.response;
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
+    await pushProgress(i, fileName, 95, 'saving', `Menyimpan ${fileLabel}...`);
     const { data: latestSession } = await supabase
       .from('sessions')
       .select('generated_files')
@@ -475,10 +606,16 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
 
     await new Promise(r => setTimeout(r, 1500));
 
-    if (countGeneratedSpecFiles(existingFiles) > 2) {
-      previewLimit = config.previewLimit || 2000;
-    }
   }
+
+  await updateGenerationProgress(supabase, sessionId, {
+    currentFileIndex: FILE_ORDER.length - 1,
+    currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
+    currentFileProgress: 100,
+    overallProgress: 95,
+    stage: 'consistency_check',
+    message: 'Final consistency check...',
+  });
 
   // Final consistency check against PRD
   const { data: latestBeforeConsistency } = await supabase
@@ -520,6 +657,15 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
       }
     }
   }
+
+  await updateGenerationProgress(supabase, sessionId, {
+    currentFileIndex: FILE_ORDER.length - 1,
+    currentFileName: FILE_ORDER[FILE_ORDER.length - 1],
+    currentFileProgress: 100,
+    overallProgress: 100,
+    stage: 'done',
+    message: 'Selesai',
+  });
 
   await updateSessionWithRetry(supabase, sessionId, { generated_at: new Date().toISOString() });
 }
@@ -608,7 +754,7 @@ export default async (req) => {
   }
 
   const backgroundSecret = process.env.BACKGROUND_SECRET;
-  if (backgroundSecret && req.headers.get('X-Background-Secret') !== backgroundSecret) {
+  if (!backgroundSecret || req.headers.get('X-Background-Secret') !== backgroundSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },
@@ -713,10 +859,18 @@ export default async (req) => {
       consistencyMode: capabilities.consistencyMode,
     };
 
-    await supabase
+    const startedAt = new Date().toISOString();
+    const { error: startUpdateError } = await supabase
       .from('sessions')
-      .update({ updated_at: new Date().toISOString(), generation_status: 'generating', generation_error: null })
+      .update({ updated_at: startedAt, generation_status: 'generating', generation_error: null, generation_started_at: startedAt })
       .eq('id', sessionId);
+
+    if (startUpdateError) {
+      await supabase
+        .from('sessions')
+        .update({ updated_at: startedAt, generation_status: 'generating', generation_error: null })
+        .eq('id', sessionId);
+    }
 
     if (mode === 'n8n') {
       await generateN8n(supabase, sessionId, messages, aiConfig);

@@ -2,16 +2,17 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
+type RouteContext = { params: Record<string, string> };
+
 type AuthenticatedApiHandler = (
-  req: Request,
-  context: { params: any },
-  supabase: SupabaseClient,
-  user: User
+  _req: Request,
+  _context: RouteContext,
+  _supabase: SupabaseClient,
+  _user: User
 ) => Promise<Response>;
 
-// ponytail: HOF to handle auth boilerplate in API routes.
 export function withAuth(handler: AuthenticatedApiHandler) {
-  return async function (req: Request, context: { params: any }) {
+  return async function (req: Request, context: RouteContext) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

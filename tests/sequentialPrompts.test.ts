@@ -50,6 +50,23 @@ describe('sequentialPrompts', () => {
     expect(prompt).toContain('Jangan membahas database, API, struktur folder, desain visual');
   });
 
+  it('should use Project State instead of raw chat for PRD when available', () => {
+    const prompt = buildFilePrompt(
+      0,
+      [{ role: 'user', content: 'chat lama yang tidak perlu dikirim' }],
+      {},
+      0,
+      'high',
+      { nama_proyek: 'Booking Klinik', fitur: ['Reservasi dokter'] },
+      'User memilih aplikasi web.',
+    );
+
+    expect(prompt).toContain('PROJECT STATE');
+    expect(prompt).toContain('Booking Klinik');
+    expect(prompt).toContain('ROLLING SUMMARY');
+    expect(prompt).not.toContain('CONVERSATION:');
+  });
+
   it('should generate atomic tasks prompt for low-context AI implementation', () => {
     const prompt = buildFilePrompt(7, [{ role: 'user', content: 'Saya ingin membuat aplikasi booking klinik.' }], {
       '01_PRD.md': '# 01_PRD.md\n\nAplikasi booking klinik',

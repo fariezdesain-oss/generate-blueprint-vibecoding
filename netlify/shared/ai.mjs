@@ -5,27 +5,42 @@ import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const LEGACY_ALGORITHM = 'aes-256-cbc';
-const ENCRYPTION_VERSION = 'v2';
+const ENCRYPTION_VERSION = 'v3';
+const PREVIOUS_ENCRYPTION_VERSION = 'v2';
 
-function getKey() {
+function getKey(salt) {
   const secret = process.env.ENCRYPTION_SECRET;
   if (!secret) throw new Error('ENCRYPTION_SECRET is not set');
-  return crypto.scryptSync(secret, 'salt', 32);
+  return crypto.scryptSync(secret, salt, 32);
 }
 
 export function decrypt(encryptedText) {
-  const key = getKey();
   const parts = encryptedText.split(':');
 
   if (parts[0] === ENCRYPTION_VERSION) {
-    const [, ivHex, authTagHex, encrypted] = parts;
-    if (!ivHex || !authTagHex || !encrypted) throw new Error('Invalid encrypted text');
+    const [, saltHex, ivHex, authTagHex, encrypted] = parts;
+    if (parts.length !== 5 || !saltHex || !ivHex || !authTagHex || !encrypted) throw new Error('Invalid encrypted text');
+    const key = getKey(Buffer.from(saltHex, 'hex'));
     const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
     decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
   }
+
+  const key = getKey('salt');
+
+  if (parts[0] === PREVIOUS_ENCRYPTION_VERSION) {
+    const [, ivHex, authTagHex, encrypted] = parts;
+    if (parts.length !== 4 || !ivHex || !authTagHex || !encrypted) throw new Error('Invalid encrypted text');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  }
+
+  if (/^v\d+$/.test(parts[0])) throw new Error('Invalid encrypted text');
 
   const iv = Buffer.from(parts.shift(), 'hex');
   const encrypted = parts.join(':');
@@ -41,9 +56,9 @@ export function detectModelCapabilities(providerName, modelName) {
   const low = /free|8b|7b|(^|[-_/:])mini($|[-_/:])|(^|[-_/:])small($|[-_/:])|flash-lite|gemma|llama-3\.1-8b|llama-3\.2-3b/i.test(model);
   const high = /gemini-1\.5-pro|gemini-1\.5-flash|gemini-2\.|claude-3\.?5|claude-3\.?7|claude-sonnet-4|gpt-4o|gpt-4\.1|o1|o3|128k|200k|1m/i.test(model) || provider === 'gemini';
 
-  if (low) return { contextLevel: 'low', maxTokens: 12000, previewLimit: 900, timeoutMs: provider === 'groq' ? 90000 : 150000, retryCount: 4, consistencyMode: 'light' };
+  if (low) return { contextLevel: 'low', maxTokens: 12000, previewLimit: 900, timeoutMs: provider === 'groq' ? 120000 : 150000, retryCount: 5, consistencyMode: 'light' };
   if (high) return { contextLevel: 'high', maxTokens: 32000, previewLimit: 3000, timeoutMs: 240000, retryCount: 3, consistencyMode: 'full' };
-  return { contextLevel: 'medium', maxTokens: 20000, previewLimit: 1600, timeoutMs: 180000, retryCount: 3, consistencyMode: 'light' };
+  return { contextLevel: 'medium', maxTokens: 20000, previewLimit: 1600, timeoutMs: 180000, retryCount: 4, consistencyMode: 'light' };
 }
 
 export function isFallbackableAIError(err) {
@@ -91,7 +106,7 @@ export async function callAI(prompt, config) {
 
   if (isGemini) {
     const model = config.modelName || 'gemini-2.5-flash';
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${config.apiKey}`;
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${config.apiKey}`;
     headers = { 'Content-Type': 'application/json' };
     body = JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
@@ -108,35 +123,87 @@ export async function callAI(prompt, config) {
       model: config.modelName,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: maxTokens,
+      stream: true,
     });
   }
 
+  let timer;
+  const timeoutMs = config.timeoutMs || 600000;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs || 600000);
+  
+  const resetTimer = () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), timeoutMs);
+  };
+  
+  resetTimer();
 
   try {
     const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
-    clearTimeout(timeout);
 
     if (!res.ok) {
       const errText = await res.text();
       throw new Error(`AI API error (${res.status}): ${errText}`);
     }
 
-    if (isGemini) {
-      const json = await res.json();
-      const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (!text.trim()) throw new Error('AI empty response');
-      return text;
-    } else {
-      const json = await res.json();
-      const text = json.choices?.[0]?.message?.content || '';
-      if (!text.trim()) throw new Error('AI empty response');
-      return text;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let fullResponse = '';
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      resetTimer();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        const dataStr = trimmed.slice(6).trim();
+        if (dataStr === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (isGemini) {
+            const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            fullResponse += text;
+          } else {
+            const text = parsed.choices?.[0]?.delta?.content || '';
+            fullResponse += text;
+          }
+        } catch {
+          // skip invalid json chunk
+        }
+      }
     }
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
+
+    if (buffer) {
+      const trimmed = buffer.trim();
+      if (trimmed.startsWith('data: ')) {
+        const dataStr = trimmed.slice(6).trim();
+        if (dataStr !== '[DONE]') {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (isGemini) {
+              const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              fullResponse += text;
+            } else {
+              const text = parsed.choices?.[0]?.delta?.content || '';
+              fullResponse += text;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (!fullResponse.trim()) throw new Error('AI empty response');
+    return fullResponse;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

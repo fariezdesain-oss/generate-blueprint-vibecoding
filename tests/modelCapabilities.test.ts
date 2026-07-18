@@ -15,7 +15,7 @@ describe('modelCapabilities', () => {
     expect(capabilities.contextLevel).toBe('low');
     expect(capabilities.consistencyMode).toBe('light');
     expect(capabilities.previewLimit).toBeLessThan(1000);
-    expect(capabilities.retryCount).toBe(4);
+    expect(capabilities.retryCount).toBe(5);
   });
 
   it('should default unknown models to medium context', () => {
