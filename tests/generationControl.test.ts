@@ -1,5 +1,6 @@
 import {
   GENERATION_REQUEST_LIMIT,
+  isGenerationCancelled,
   shouldContinueGeneration,
 } from '@/lib/utils/generationControl';
 
@@ -20,6 +21,12 @@ describe('generationControl', () => {
   it('does not continue after completion or malformed responses', () => {
     expect(shouldContinueGeneration({ completed: true })).toBe(false);
     expect(shouldContinueGeneration(null)).toBe(false);
+  });
+
+  it('recognizes a cancelled generation status', () => {
+    expect(isGenerationCancelled('cancelled')).toBe(true);
+    expect(isGenerationCancelled('generating')).toBe(false);
+    expect(isGenerationCancelled(null)).toBe(false);
   });
 
   it('allows all document chunks plus retry headroom', () => {

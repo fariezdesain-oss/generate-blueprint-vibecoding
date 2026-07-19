@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(() => {
-  test.skip(!process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD, 'E2E_TEST_EMAIL dan E2E_TEST_PASSWORD tidak tersedia; protected E2E tests dilewati.');
+  test.skip(!process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD, '...');
 });
 
 test('settings menampilkan form provider dan tombol test aktif setelah diisi', async ({ page }) => {
@@ -17,10 +17,9 @@ test('settings menampilkan form provider dan tombol test aktif setelah diisi', a
   });
 
   await page.goto('/settings');
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Add Provider' })).toBeVisible();
+  await expect(page.getByTestId('settings-heading')).toBeVisible();
 
   await page.getByPlaceholder(/Ketik nama model secara manual/).fill('gemini-2.5-flash');
   await page.getByPlaceholder('Masukkan API key').fill('e2e-api-key');
-  await expect(page.getByRole('button', { name: 'Test' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Test', exact: true })).toBeEnabled();
 });

@@ -62,7 +62,7 @@ export function ProviderBadge() {
 
   return (
     <div className="inline-flex items-center gap-1.5 rounded-xl bg-tertiary border border-subtle px-2.5 py-1.5">
-      <span className="size-1.5 rounded-full bg-gemini-teal shadow-[0_0_6px_rgba(20,184,166,0.5)]" />
+      <span className="size-1.5 rounded-full bg-gemini-teal " />
       <span className="text-[10px] text-tertiary truncate max-w-[140px]">{label}</span>
     </div>
   );

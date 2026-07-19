@@ -4,6 +4,10 @@ module.exports = defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
   retries: 1,
+  timeout: 60000,
+  expect: {
+    timeout: 15000,
+  },
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:3000',

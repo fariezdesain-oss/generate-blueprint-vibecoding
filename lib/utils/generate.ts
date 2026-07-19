@@ -8,6 +8,7 @@ import { isFallbackableAIError } from '@/lib/utils/providerFallback';
 import { updateSessionWithRetry } from '@/lib/utils/generationDb';
 import { hasPlaceholder } from '@/lib/utils/docQuality';
 import { autoFixWorkflow, extractJson } from '@/lib/utils/workflowJson';
+import { isGenerationCancelled } from '@/lib/utils/generationControl';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface GenerationProgress {
@@ -196,13 +197,21 @@ export async function processSequential(
   let generatedThisRun = 0;
 
   for (let i = 0; i < FILE_ORDER.length; i++) {
+    const { data: currentSession } = await supabase
+      .from('sessions')
+      .select('generation_status')
+      .eq('id', sessionId)
+      .eq('user_id', userId)
+      .single();
+    if (isGenerationCancelled(currentSession?.generation_status)) break;
+
     const fileName = FILE_ORDER[i];
     if (existingFiles[fileName]) continue;
     if (generatedThisRun >= maxFiles) break;
 
     const fileLabel = FILE_LABELS[fileName] || fileName;
 
-    await pushProgress(i, fileName, 0, 'preparing', `Menganalisis konteks untuk ${fileLabel}...`);
+    await pushProgress(i, fileName, 0, 'preparing', `Mempersiapkan konteks ${fileLabel}...`);
     const buildPromptForConfig = (config: AIProviderConfig) => {
       const previewLimit = countGeneratedSpecFiles(existingFiles) > 2 ? getPreviewLimit(config) : 0;
       return buildFilePrompt(
@@ -216,7 +225,7 @@ export async function processSequential(
       );
     };
 
-    await pushProgress(i, fileName, 25, 'generating', `Menulis ${fileLabel}...`);
+    await pushProgress(i, fileName, 25, 'generating', `Menulis dokumen dengan AI...`);
     let lastProgressUpdate = Date.now();
     let result = await generateWithProviderFallback(candidates, buildPromptForConfig, undefined, (chunk, total) => {
       // Throttle DB updates during stream to avoid overwhelming Supabase
@@ -225,22 +234,22 @@ export async function processSequential(
         // Estimated completion percentage based on typical doc sizes
         const estTotal = 4000;
         const subProgress = Math.min(40, Math.round((total.length / estTotal) * 40));
-        pushProgress(i, fileName, 25 + subProgress, 'generating', `Menulis ${fileLabel}... (${total.length} chars)`);
+        pushProgress(i, fileName, 25 + subProgress, 'generating', `Menulis dokumen dengan AI... (${total.length} chars)`);
       }
     });
     let aiResponse = result.response;
     let fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
 
-    await pushProgress(i, fileName, 70, 'generating', `Memeriksa kualitas ${fileLabel}...`);
+    await pushProgress(i, fileName, 70, 'generating', `Menganalisis kualitas dokumen...`);
     if (hasPlaceholder(fileContent)) {
-      await pushProgress(i, fileName, 80, 'fixing_placeholders', `Memperbaiki placeholder di ${fileLabel}...`);
+      await pushProgress(i, fileName, 80, 'fixing_placeholders', `Menyempurnakan konten...`);
       const correctionPrompt = `${buildPromptForConfig(result.config)}\n\nPERINGATAN: Hasil generate sebelumnya mengandung placeholder. HARAM menggunakan placeholder. Tulis ulang dengan konten SPESIFIK dan LENGKAP.`;
       result = await generateWithProviderFallback(candidates, () => correctionPrompt, 2);
       aiResponse = result.response;
       fileContent = `# ${fileName}\n\n${aiResponse.replace(/^#\s*.*\n/, '').trim()}`;
     }
 
-    await pushProgress(i, fileName, 95, 'saving', `Menyimpan ${fileLabel}...`);
+    await pushProgress(i, fileName, 95, 'saving', `Menyimpan dokumen...`);
     const { data: latestSession } = await supabase
       .from('sessions')
       .select('generated_files')
@@ -288,7 +297,7 @@ export async function processSequential(
     currentFileProgress: 100,
     overallProgress: 95,
     stage: 'consistency_check',
-    message: 'Final consistency check...',
+    message: 'Memeriksa konsistensi...',
   });
 
   const { data: latestBeforeConsistency } = await supabase
@@ -400,6 +409,15 @@ export async function processN8nSync(
   if (!parsed) {
     throw new Error(`Gagal generate n8n workflow setelah 3 percobaan. ${lastError ? 'Error: ' + lastError : ''}`);
   }
+
+  const { data: currentSession } = await supabase
+    .from('sessions')
+    .select('generation_status')
+    .eq('id', sessionId)
+    .eq('user_id', userId)
+    .single();
+
+  if (isGenerationCancelled(currentSession?.generation_status)) return;
 
   const updateData: Record<string, unknown> = {
     n8n_workflow: parsed.workflow,

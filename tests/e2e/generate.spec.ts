@@ -30,13 +30,13 @@ test('tombol generate disabled lalu enabled setelah readiness signal', async ({ 
 
   await page.goto('/chat');
   await page.getByRole('button', { name: /Dokumen Instruksi Vibecoding/ }).click();
-  await page.getByPlaceholder('Contoh: Aplikasi kasir toko').fill('E2E Generate');
-  await page.getByRole('button', { name: 'Mulai Chat' }).click();
+  await page.getByTestId('chat-title-input').fill('E2E Generate');
+  await page.getByTestId('start-chat-button').click();
 
-  const generateButton = page.locator('button[title="Selesaikan dulu sesi diskusi proyek Anda"]');
+  const generateButton = page.getByTestId('generate-button');
   await expect(generateButton).toBeDisabled();
 
-  await page.getByPlaceholder('Ketik pesan...').fill('Siap generate');
-  await page.getByPlaceholder('Ketik pesan...').press('Enter');
-  await expect(page.locator('button[title="Generate 9 Engineering Documents"]')).toBeEnabled();
+  await page.getByTestId('chat-textarea').fill('Siap generate');
+  await page.getByTestId('chat-textarea').press('Enter');
+  await expect(generateButton).toBeEnabled();
 });

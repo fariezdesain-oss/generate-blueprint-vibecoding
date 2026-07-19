@@ -3,8 +3,19 @@
 import { Suspense, useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { Copy, Download, FileText, Archive, RefreshCw, Sparkles, ChevronDown, Workflow } from 'lucide-react';
+import { Copy, Download, FileText, Archive, RefreshCw, Wand2, Workflow } from 'lucide-react';
 import { FILE_ORDER, FILE_LABELS } from '@/lib/utils/sequentialPrompts';
+const N8nVisualizer = dynamic(
+  () => import('@/components/ui/n8n/N8nVisualizer').then((m) => m.N8nVisualizer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-[400px] items-center justify-center rounded-xl bg-tertiary">
+        <Wand2 className="size-6 animate-wand-swing text-tertiary" />
+      </div>
+    ),
+  }
+);
 
 const MarkdownRenderer = dynamic(
   () => import('@/components/ui/MarkdownRenderer').then((m) => m.MarkdownRenderer),
@@ -39,7 +50,6 @@ function GenerateResultsContent() {
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(true);
   const [n8nTab, setN8nTab] = useState<'json' | 'setup'>('json');
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -141,18 +151,24 @@ function GenerateResultsContent() {
 
   const handleDownloadAll = async () => {
     if (!data) return;
-    const res = await fetch('/api/generate/download', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: data.files }),
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'documentation.zip';
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetch('/api/generate/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files: data.files }),
+      });
+      if (!res.ok) throw new Error('Download failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'documentation.zip';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Download error:', err);
+      setError(err instanceof Error ? err.message : 'Gagal mengunduh ZIP');
+    }
   };
 
   const handleRegenerate = async (fileName: string) => {
@@ -197,7 +213,7 @@ function GenerateResultsContent() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <div className="size-5 sm:size-6 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+        <Wand2 className="size-5 sm:size-6 animate-wand-swing text-gemini-blue" />
       </div>
     );
   }
@@ -219,8 +235,8 @@ function GenerateResultsContent() {
   if (isN8n) {
     if (!n8nData) {
       return (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
-          <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
+          <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
             <Workflow className="size-6 sm:size-8 text-tertiary" />
           </div>
           <p className="text-sm sm:text-lg text-tertiary">Belum ada n8n workflow untuk sesi ini</p>
@@ -241,7 +257,7 @@ function GenerateResultsContent() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-subtle px-4 sm:px-6 py-3 sm:py-5 gap-2 sm:gap-0">
           <div>
-            <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-extrabold">n8n Workflow</h1>
+            <h1 data-testid="results-heading" className="font-display text-primary text-lg sm:text-xl lg:text-2xl font-extrabold">n8n Workflow</h1>
             <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-semibold text-tertiary">Generated berdasarkan percakapan Anda</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
@@ -262,6 +278,7 @@ function GenerateResultsContent() {
                   <span className="sm:hidden">{copied === 'n8n' ? 'Copied!' : 'Copy'}</span>
                 </button>
                 <button
+                  data-testid="download-button"
                   onClick={() => handleDownload(jsonStr, 'n8n-workflow.json')}
                   className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold"
                 >
@@ -299,25 +316,12 @@ function GenerateResultsContent() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8">
+        <div className="flex-1 overflow-hidden p-0 m-0 relative">
           {n8nTab === 'json' ? (
-            <>
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="mb-4 flex items-center gap-2 text-sm font-semibold text-secondary hover:text-primary transition-colors"
-              >
-                <ChevronDown size={16} className={`transition-transform ${expanded ? 'rotate-0' : '-rotate-90'}`} />
-                Workflow JSON
-              </button>
-              {expanded && (
-                <pre className="whitespace-pre-wrap font-mono text-sm font-semibold leading-loose text-primary">
-                  {jsonStr}
-                </pre>
-              )}
-            </>
+            <N8nVisualizer workflowJson={jsonStr} />
           ) : (
-            <div className="mx-auto max-w-3xl">
-              <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 sm:px-5 py-3 sm:py-4">
+            <div className="mx-auto max-w-3xl overflow-y-auto h-full p-4 sm:p-8">
+              <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-4 sm:px-5 py-3 sm:py-4">
                 <div className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
                   <svg className="size-4 sm:size-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
@@ -340,8 +344,8 @@ function GenerateResultsContent() {
 
   if (!data) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
-        <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
+        <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
           <FileText className="size-6 sm:size-8 text-tertiary" />
         </div>
         <p className="text-sm sm:text-lg text-tertiary">Belum ada hasil generate untuk sesi ini</p>
@@ -362,7 +366,7 @@ function GenerateResultsContent() {
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-subtle px-4 sm:px-6 py-3 sm:py-5 gap-2 sm:gap-0">
         <div>
-          <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-extrabold">Generated Documentation</h1>
+          <h1 className="font-display text-primary text-lg sm:text-xl lg:text-2xl font-extrabold">Generated Documentation</h1>
           <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs font-semibold text-tertiary">{generatedCount} / {FILE_ORDER.length} files generated</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
@@ -373,7 +377,8 @@ function GenerateResultsContent() {
             Back to Chat
           </button>
           <button
-            onClick={handleDownloadAll}
+                  data-testid="download-button"
+                  onClick={handleDownloadAll}
             className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold"
           >
             <Archive className="size-3 sm:size-4" />
@@ -404,7 +409,7 @@ function GenerateResultsContent() {
             >
               {name}
               {!hasFile && !isRegenerating && <span className="ml-1 text-[10px]">—</span>}
-              {isRegenerating && <span className="ml-1.5 inline-block size-2 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />}
+              {isRegenerating && <Wand2 className="ml-1.5 size-3 animate-wand-swing text-gemini-blue" />}
             </button>
           );
         })}
@@ -433,7 +438,7 @@ function GenerateResultsContent() {
                   <FileText className="size-3.5 lg:size-4 shrink-0" />
                   <span className="truncate">{name}</span>
                   {isRegenerating && (
-                    <span className="ml-auto size-3 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />
+                    <Wand2 className="ml-auto size-3 animate-wand-swing text-gemini-blue" />
                   )}
                   {!hasFile && !isRegenerating && <span className="ml-auto text-[10px] lg:text-[11px] font-bold text-tertiary">—</span>}
                 </button>
@@ -482,9 +487,9 @@ function GenerateResultsContent() {
               </div>
             </>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 animate-float">
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-tertiary ring-1 ring-[var(--border)]">
-                <Sparkles className="size-6 sm:size-8 text-tertiary" />
+            <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
+              <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
+                <Wand2 className="size-6 sm:size-8 text-tertiary" />
               </div>
               <p className="text-sm sm:text-lg text-tertiary">File not available</p>
             </div>

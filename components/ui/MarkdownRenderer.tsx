@@ -5,14 +5,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import dynamic from 'next/dynamic';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check , Wand2} from 'lucide-react';
 import type { Components } from 'react-markdown';
 
 const MermaidBlock = dynamic(
   () => import('./MermaidBlock').then((m) => m.MermaidBlock),
   { ssr: false, loading: () => (
     <div className="my-4 flex items-center gap-2 rounded-xl border border-subtle bg-tertiary p-4">
-      <span className="inline-block size-3 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />
+      <Wand2 className="size-3 animate-wand-swing text-gemini-blue" />
       <span className="text-xs text-tertiary">Memuat diagram...</span>
     </div>
   )}
@@ -45,7 +45,7 @@ const markdownComponents: Components = {
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-8 mb-3 text-lg font-extrabold text-gemini-blue">
+    <h2 className="mt-8 mb-3 text-lg font-extrabold text-primary">
       {children}
     </h2>
   ),
@@ -65,12 +65,12 @@ const markdownComponents: Components = {
     </p>
   ),
   ul: ({ children }) => (
-    <ul className="mb-4 ml-5 list-disc space-y-1 text-secondary marker:text-gemini-blue">
+    <ul className="mb-4 ml-5 list-disc space-y-1 text-secondary marker:text-secondary">
       {children}
     </ul>
   ),
   ol: ({ children }) => (
-    <ol className="mb-4 ml-5 list-decimal space-y-1 text-secondary marker:text-gemini-blue">
+    <ol className="mb-4 ml-5 list-decimal space-y-1 text-secondary marker:text-secondary">
       {children}
     </ol>
   ),

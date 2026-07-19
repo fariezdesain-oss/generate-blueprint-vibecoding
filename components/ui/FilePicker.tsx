@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { Paperclip, X, FileIcon, ImageIcon, Loader2 } from 'lucide-react';
+import { Paperclip, X, FileIcon, ImageIcon, Wand2 } from 'lucide-react';
 import { FilePreviewModal } from './FilePreviewModal';
 import type { Attachment } from '@/types/chat';
 
@@ -98,7 +98,7 @@ export function FilePicker({ sessionId, onFilesReady, disabled }: FilePickerProp
         <>
           {uploading ? (
             <div className="flex items-center gap-1.5 rounded-lg border border-subtle bg-secondary px-3 py-1.5">
-              <Loader2 size={14} className="animate-spin text-gemini-blue" />
+              <Wand2 size={14} className="animate-wand-swing text-primary" />
               <span className="text-xs text-tertiary">Uploading...</span>
             </div>
           ) : (

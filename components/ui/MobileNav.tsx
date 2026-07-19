@@ -3,8 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Menu, X, Sparkles, Plus, History, Settings, LogOut } from 'lucide-react';
+import { Menu, X, Wand2, Plus, History, Settings } from 'lucide-react';
 import { ProviderBadge } from './ProviderBadge';
+import { LogoutButton } from './LogoutButton';
+import { ThemeToggle } from './ThemeToggle';
+import { SidebarHistory } from './SidebarHistory';
 import { useChatStore } from '@/store/useChatStore';
 
 export function MobileNav() {
@@ -21,13 +24,13 @@ export function MobileNav() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 border-b border-subtle backdrop-blur-xl px-4 py-3 md:hidden" style={{ backgroundColor: `rgba(var(--bg-primary-rgb), 0.8)` }}>
+      <header className="fixed top-0 left-0 right-0 z-20 flex items-center justify-between gap-2 border-b border-subtle px-4 py-3 md:hidden" style={{ backgroundColor: `rgba(var(--bg-primary-rgb), 0.8)` }}>
           <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/20 ring-1 ring-[var(--border)]">
-              <Sparkles className="size-4 text-gemini-blue" />
+            <div className="brutal-icon size-8 min-w-8 min-h-8 rounded-md bg-gemini-orange shadow-[2px_2px_0_var(--border)]">
+              <Wand2 className="size-4 text-[#111]" />
             </div>
             <div>
-              <h1 className="text-gradient text-base font-extrabold leading-tight">Vibecoding</h1>
+              <h1 className="font-display text-primary text-base font-extrabold leading-tight">Vibecoding</h1>
               <p className="text-xs font-semibold text-tertiary">Docs Generator</p>
             </div>
           </div>
@@ -44,17 +47,17 @@ export function MobileNav() {
       {open && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            className="absolute inset-0 bg-overlay backdrop-blur-sm"
+            className="absolute inset-0 bg-overlay "
             onClick={() => setOpen(false)}
           />
-          <aside className="glass relative flex h-full w-72 flex-col p-4 shadow-2xl">
+          <aside className="brutal-card relative flex h-full w-72 flex-col p-4 shadow-[var(--shadow)]">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/20 ring-1 ring-[var(--border)]">
-                  <Sparkles className="size-4 text-gemini-blue" />
+                <div className="brutal-icon size-8 min-w-8 min-h-8 rounded-md bg-gemini-orange shadow-[2px_2px_0_var(--border)]">
+                  <Wand2 className="size-4 text-[#111]" />
                 </div>
                 <div>
-                  <h1 className="text-gradient text-base font-extrabold leading-tight">Vibecoding</h1>
+                  <h1 className="font-display text-primary text-base font-extrabold leading-tight">Vibecoding</h1>
                   <p className="text-xs font-semibold text-tertiary">Docs Generator</p>
                 </div>
               </div>
@@ -66,17 +69,17 @@ export function MobileNav() {
               </button>
             </div>
 
-            <div className="mb-4 px-3">
+            <div className="mb-3 px-3">
               <ProviderBadge />
             </div>
 
-            <nav className="mb-4 flex flex-col gap-1">
+            <nav className="mb-3 flex flex-col gap-1">
               <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-tertiary">Navigasi</p>
               <button
                 onClick={handleNewChat}
                 className="group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
               >
-                <Plus size={16} className="text-gemini-blue" />
+                <Plus size={16} className="text-primary" />
                 New Chat
               </button>
               <Link
@@ -97,20 +100,15 @@ export function MobileNav() {
               </Link>
             </nav>
 
-            <div className="mt-auto">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-                    sessionStorage.clear();
-                    router.push('/login');
-                  });
-                }}
-                className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-secondary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
-              >
-                <LogOut size={16} />
-                Logout
-              </button>
+            <div className="flex flex-1 flex-col overflow-hidden mb-2">
+              <SidebarHistory onItemClick={() => setOpen(false)} />
+            </div>
+
+            <div className="mt-auto flex flex-col gap-2 pb-2 pt-2 border-t border-subtle">
+              <ThemeToggle />
+              <div onClick={() => setOpen(false)}>
+                <LogoutButton />
+              </div>
             </div>
           </aside>
         </div>

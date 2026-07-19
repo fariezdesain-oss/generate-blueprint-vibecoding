@@ -6,7 +6,7 @@ import { processSequential, processN8nSync } from '@/lib/utils/generate';
 import { detectModelCapabilities } from '@/lib/utils/modelCapabilities';
 import { loadProviderFallbackCandidates } from '@/lib/utils/providerFallback';
 import { rateLimitResponse } from '@/lib/utils/rateLimit';
-import { GENERATION_REQUEST_LIMIT } from '@/lib/utils/generationControl';
+import { GENERATION_REQUEST_LIMIT, isGenerationCancelled } from '@/lib/utils/generationControl';
 import { withAuth } from '@/lib/utils/apiAuth';
 
 export const POST = withAuth(async (req, _context, supabase, user) => {
@@ -152,12 +152,29 @@ export const POST = withAuth(async (req, _context, supabase, user) => {
       return NextResponse.json({ success: true, data: { jobId: sessionId, mode, ...result } });
     }
 
-    try { await supabase.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', user.id); } catch { /* kolom mungkin belum ada */ }
+    const { data: currentSession } = await supabase
+      .from('sessions')
+      .select('generation_status')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (!isGenerationCancelled(currentSession?.generation_status)) {
+      try { await supabase.from('sessions').update({ generation_status: 'completed' }).eq('id', sessionId).eq('user_id', user.id); } catch { /* kolom mungkin belum ada */ }
+    }
 
     return NextResponse.json({ success: true, data: { jobId: sessionId, mode, completed: true } });
   } catch (err) {
     const { code, message } = formatAIError(err);
-    try { await supabase.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', user.id); } catch { /* kolom mungkin belum ada */ }
+    const { data: currentSession } = await supabase
+      .from('sessions')
+      .select('generation_status')
+      .eq('id', sessionId)
+      .eq('user_id', user.id)
+      .single();
+    if (!isGenerationCancelled(currentSession?.generation_status)) {
+      try { await supabase.from('sessions').update({ generation_status: 'failed', generation_error: message }).eq('id', sessionId).eq('user_id', user.id); } catch { /* kolom mungkin belum ada */ }
+    }
     return NextResponse.json(
       { success: false, error: { code, message } },
       { status: 500 },

@@ -71,13 +71,55 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
 
   useEffect(() => {
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (pollingRef.current) clearTimeout(pollingRef.current);
     };
   }, []);
 
   useEffect(() => {
     regenerateRequestedRef.current = null;
   }, [sessionId]);
+
+  useEffect(() => {
+    if (!generating || mode !== 'n8n') return;
+    
+    setGenProgress((prev) => ({ 
+      ...prev, 
+      overallProgress: 20,
+      stageMessage: 'Menganalisis percakapan...' 
+    }));
+    
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start;
+      
+      setGenProgress((prev) => {
+        let newProgress = prev.overallProgress;
+        let newMessage = prev.stageMessage;
+        
+        if (elapsed > 70000) {
+          newProgress = 90;
+          newMessage = 'Finalisasi workflow...';
+        } else if (elapsed > 40000) {
+          newProgress = 80;
+          newMessage = 'Menyempurnakan konfigurasi...';
+        } else if (elapsed > 20000) {
+          newProgress = 60;
+          newMessage = 'Memvalidasi struktur workflow...';
+        } else if (elapsed > 8000) {
+          newProgress = 40;
+          newMessage = 'Membuat node workflow...';
+        }
+        
+        return { 
+          ...prev, 
+          overallProgress: newProgress,
+          stageMessage: newMessage 
+        };
+      });
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [generating, mode]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -109,18 +151,18 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   useEffect(() => {
     if (sessionIdUrlParam) {
       setLoadingMessages(true);
-      useChatStore.getState().reset();
+      setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
       fetch(`/api/chat?session_id=${sessionIdUrlParam}`)
         .then((r) => {
           if (r.status === 401) {
             clearActiveChatSession(sessionStorage);
-            useChatStore.getState().reset();
+            setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
             router.replace('/login');
             return null;
           }
           if (!r.ok) {
             clearActiveChatSession(sessionStorage);
-            useChatStore.getState().reset();
+            setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
             router.replace('/chat');
             return null;
           }
@@ -151,7 +193,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         })
         .catch(() => {
           clearActiveChatSession(sessionStorage);
-          useChatStore.getState().reset();
+          setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
           router.replace('/chat');
         })
         .finally(() => setLoadingMessages(false));
@@ -159,7 +201,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     }
 
     if (!sessionId && useChatStore.getState().sessionId) {
-      useChatStore.getState().reset();
+      setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
     }
 
     const savedSessionId =
@@ -240,7 +282,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         if (res.status === 401) {
           if (activeSessionRef.current === targetId) {
             clearActiveChatSession(sessionStorage);
-            useChatStore.getState().reset();
+            setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
             router.replace('/login');
           }
           return;
@@ -294,7 +336,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   const lastMessageRef = useRef<{ content: string; time: number } | null>(null);
 
   const sendMessage = async () => {
-    if (loadingMessages || switchingSession || sendingRef.current || isGenerating) return;
+    if (loadingMessages || switchingSession || sendingRef.current || isGenerating || generating) return;
     const content = input.trim();
     const hasFiles = pendingFiles.length > 0;
     if (!content && !hasFiles) return;
@@ -588,6 +630,15 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
             stageMessage: `Regenerate ${FILE_LABELS[fileName] || fileName}...`,
           });
 
+          // Fake interval progress during sequential generation
+          const progressInterval = setInterval(() => {
+            setGenProgress((prev) => {
+              if (prev.fileProgress >= 95) return prev;
+              const increment = prev.fileProgress < 60 ? 5 : 2;
+              return { ...prev, fileProgress: Math.min(prev.fileProgress + increment, 95) };
+            });
+          }, 800);
+
           const controller = new AbortController();
           partialGenerationAbortRef.current = controller;
           const res = await fetch('/api/generate/sequential', {
@@ -597,12 +648,13 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
             signal: controller.signal,
           });
           partialGenerationAbortRef.current = null;
+          clearInterval(progressInterval);
 
           if (!res.ok) {
             stopPolling();
             if (res.status === 401) {
               clearActiveChatSession(sessionStorage);
-              useChatStore.getState().reset();
+              setGenerating(false); setGenProgress({ current: 0, total: FILE_ORDER.length, fileName: '', fileProgress: 0, overallProgress: 0, stage: '', stageMessage: '' }); useChatStore.getState().reset();
               router.replace('/login');
             } else {
               setChatError(`Gagal regenerate ${fileName}. Silakan coba lagi.`);
@@ -805,9 +857,9 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
     <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
       {generating && mode === 'n8n' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-6 sm:p-8 shadow-2xl">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm brutal-card !rounded-none p-6 sm:p-8 !shadow-[6px_6px_0_var(--border)]">
             <div className="flex flex-col items-center gap-4 sm:gap-6">
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 ring-1 ring-emerald-500/20">
+              <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border bg-emerald-500/20">
                 <svg className="size-6 sm:size-8 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
@@ -816,14 +868,28 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 <p className="text-sm font-bold text-primary">Membuat workflow n8n...</p>
                 <p className="text-xs text-tertiary">Menganalisis percakapan dan menyusun template</p>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block size-2 rounded-full bg-emerald-400 animate-bounce-dot" style={{ animationDelay: '-0.32s' }} />
-                <span className="inline-block size-2 rounded-full bg-emerald-400 animate-bounce-dot" style={{ animationDelay: '-0.16s' }} />
-                <span className="inline-block size-2 rounded-full bg-emerald-400 animate-bounce-dot" style={{ animationDelay: '0s' }} />
+              <div className="w-full space-y-4">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black uppercase text-secondary">
+                    <span>Progres Pembuatan Workflow</span>
+                    <span>{genProgress.overallProgress}%</span>
+                  </div>
+                  <div className="h-4 w-full !rounded-none border-2 border-border bg-secondary shadow-[3px_3px_0_var(--border)] overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 border-r-2 border-border transition-all duration-300 ease-out"
+                      style={{ width: `${genProgress.overallProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '-0.32s' }} />
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '-0.16s' }} />
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '0s' }} />
               </div>
               <button
                 onClick={stopPolling}
-                className="flex min-h-11 items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
+                className="flex min-h-11 items-center gap-2 !rounded-none border-2 border-border bg-gemini-red py-2 px-4 text-sm font-black uppercase text-[#111] transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
               >
                 <Square className="size-4 fill-current" />
                 Hentikan Generate
@@ -838,9 +904,9 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
 
       {generating && mode !== 'n8n' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-md glass rounded-2xl p-6 sm:p-8 shadow-2xl">
+          <div className="animate-fade-in-up mx-4 w-full max-w-md brutal-card !rounded-none p-6 sm:p-8 !shadow-[6px_6px_0_var(--border)]">
             <div className="flex flex-col items-center gap-4 sm:gap-6">
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/10 ring-1 ring-gemini-blue/20">
+              <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border bg-gemini-blue/20">
                 <svg className="size-6 sm:size-8 text-gemini-blue" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                   <polyline points="14 2 14 8 20 8" />
@@ -853,27 +919,27 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 <p className="text-sm font-bold text-primary">{genProgress.stageMessage || 'Membuat dokumen...'}</p>
                 <p className="text-xs text-secondary">{genProgress.fileName ? FILE_LABELS[genProgress.fileName] || genProgress.fileName : 'Mempersiapkan dokumen...'}</p>
               </div>
-              <div className="w-full space-y-3">
+              <div className="w-full space-y-4">
                 <div>
-                  <div className="mb-1 flex items-center justify-between text-xs text-secondary">
-                    <span>Progress Dokumen Saat Ini</span>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black uppercase text-secondary">
+                    <span>Progres Dokumen Saat Ini</span>
                     <span>{genProgress.fileProgress}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-tertiary">
+                  <div className="h-4 w-full !rounded-none border-2 border-border bg-secondary shadow-[3px_3px_0_var(--border)] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-gemini-blue to-gemini-pink transition-all duration-500"
+                      className="h-full bg-emerald-500 border-r-2 border-border transition-all duration-300 ease-out"
                       style={{ width: `${genProgress.fileProgress}%` }}
                     />
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 flex items-center justify-between text-xs text-secondary">
-                    <span>Progress Keseluruhan</span>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black uppercase text-secondary">
+                    <span>Progres Keseluruhan</span>
                     <span>{genProgress.overallProgress}%</span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-tertiary">
+                  <div className="h-3 w-full !rounded-none border-2 border-border bg-secondary shadow-[2px_2px_0_var(--border)] overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-gemini-blue via-gemini-blue to-gemini-pink transition-all duration-500"
+                      className="h-full bg-emerald-500 border-r-2 border-border transition-all duration-300 ease-out"
                       style={{ width: `${genProgress.overallProgress}%` }}
                     />
                   </div>
@@ -883,21 +949,21 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                 {FILE_ORDER.map((name, i) => (
                   <div
                     key={name}
-                    className={`size-2 rounded-full transition-all duration-300 ${
+                    className={`size-3 border-2 border-border !rounded-none transition-all duration-300 ${
                       i < genProgress.current
-                        ? 'bg-gemini-blue shadow-[0_0_6px_rgba(59,130,246,0.5)]'
+                        ? 'bg-emerald-500 shadow-[1px_1px_0_var(--border)]'
                         : i === genProgress.current
-                          ? 'bg-gemini-blue/60 animate-pulse'
-                          : 'bg-tertiary'
+                          ? 'bg-emerald-400 animate-pulse'
+                          : 'bg-tertiary shadow-none'
                     }`}
                     title={name}
                   />
                 ))}
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block size-2 rounded-full bg-gemini-blue animate-bounce-dot" style={{ animationDelay: '-0.32s' }} />
-                <span className="inline-block size-2 rounded-full bg-gemini-blue animate-bounce-dot" style={{ animationDelay: '-0.16s' }} />
-                <span className="inline-block size-2 rounded-full bg-gemini-blue animate-bounce-dot" style={{ animationDelay: '0s' }} />
+              <div className="flex items-center gap-2">
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '-0.32s' }} />
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '-0.16s' }} />
+                <span className="inline-block size-3 !rounded-none border-2 border-border bg-emerald-500 animate-bounce-dot shadow-[1px_1px_0_var(--border)]" style={{ animationDelay: '0s' }} />
               </div>
               <button
                 onClick={stopPolling}
@@ -946,6 +1012,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
           <div className="flex gap-2 sm:gap-3">
             <div className="relative flex-1">
               <textarea
+                data-testid="chat-textarea"
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

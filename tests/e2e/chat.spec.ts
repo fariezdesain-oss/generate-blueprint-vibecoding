@@ -19,13 +19,13 @@ async function bukaSesiChat(page: import('@playwright/test').Page) {
 
   await page.goto('/chat');
   await page.getByRole('button', { name: /Dokumen Instruksi Vibecoding/ }).click();
-  await page.getByPlaceholder('Contoh: Aplikasi kasir toko').fill('E2E Chat');
-  await page.getByRole('button', { name: 'Mulai Chat' }).click();
+  await page.getByTestId('chat-title-input').fill('E2E Chat');
+  await page.getByTestId('start-chat-button').click();
 }
 
 test('chat menampilkan empty state atau textarea', async ({ page }) => {
   await bukaSesiChat(page);
-  await expect(page.getByText('Mulai Percakapan').or(page.getByPlaceholder('Ketik pesan...'))).toBeVisible();
+  await expect(page.getByTestId('chat-textarea')).toBeVisible();
 });
 
 test('chat bisa mengirim pesan dengan mock streaming', async ({ page }) => {
@@ -42,8 +42,8 @@ test('chat bisa mengirim pesan dengan mock streaming', async ({ page }) => {
     await route.fallback();
   });
 
-  await page.getByPlaceholder('Ketik pesan...').fill('Halo dari E2E');
-  await page.getByPlaceholder('Ketik pesan...').press('Enter');
+  await page.getByTestId('chat-textarea').fill('Halo dari E2E');
+  await page.getByTestId('chat-textarea').press('Enter');
   await expect(page.getByText('Halo dari E2E')).toBeVisible();
   await expect(page.getByText('E2E_CHAT_SENTINEL')).toBeVisible();
 });
@@ -82,10 +82,13 @@ test('chat regenerate parsial hanya memproses file yang diminta', async ({ page 
     await route.fulfill({ json: { success: true, data: { file_index: body.file_index } } });
   });
 
-  await page.getByPlaceholder('Ketik pesan...').fill('Generate ulang tasks dan AI rules');
-  await page.getByPlaceholder('Ketik pesan...').press('Enter');
+  await page.getByTestId('chat-textarea').fill('Generate ulang tasks dan AI rules');
+  await page.getByTestId('chat-textarea').press('Enter');
   await expect(page.getByText(/Saya akan regenerate 08_TASKS.md/)).toBeVisible();
-  await page.getByLabel('Generate dokumentasi').click();
+  
+  // Tunggu animasi button selesai
+  await expect(page.getByTestId('generate-button')).toBeEnabled();
+  await page.getByTestId('generate-button').click();
 
   await expect.poll(() => sequentialCalls).toEqual([7, 8]);
   expect(deletedFiles).toEqual(['08_TASKS.md', '09_AI_RULES.md']);

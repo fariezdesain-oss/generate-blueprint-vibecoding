@@ -1,4 +1,5 @@
 'use client';
+import { Wand2 } from 'lucide-react';
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -85,7 +86,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     <div className="my-4 overflow-x-auto">
       {!rendered && (
         <div className="flex items-center gap-2 rounded-xl border border-subtle bg-tertiary p-4">
-          <span className="inline-block size-3 rounded-full border-2 border-gemini-blue/50 border-t-gemini-blue animate-spin" />
+          <Wand2 className="size-3 animate-wand-swing text-gemini-blue" />
           <span className="text-xs text-tertiary">Merender diagram...</span>
         </div>
       )}

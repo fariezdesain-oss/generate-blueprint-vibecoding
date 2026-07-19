@@ -537,6 +537,13 @@ async function generateDocs(supabase, sessionId, messages, config, fallbackCandi
   };
 
   for (let i = 0; i < FILE_ORDER.length; i++) {
+    const { data: currentSession } = await supabase
+      .from('sessions')
+      .select('generation_status')
+      .eq('id', sessionId)
+      .single();
+    if (currentSession?.generation_status === 'cancelled') break;
+
     const fileName = FILE_ORDER[i];
 
     if (existingFiles[fileName]) continue;
@@ -726,6 +733,14 @@ async function generateN8n(supabase, sessionId, messages, config) {
     throw new Error(`Gagal generate n8n workflow setelah ${MAX_ATTEMPTS} percobaan. ${lastError ? 'Error: ' + lastError : ''}`);
   }
 
+  const { data: currentSession } = await supabase
+    .from('sessions')
+    .select('generation_status')
+    .eq('id', sessionId)
+    .single();
+
+  if (currentSession?.generation_status === 'cancelled') return;
+
   const updateData = {
     n8n_workflow: parsed.workflow,
     n8n_generated_at: new Date().toISOString(),
@@ -883,10 +898,18 @@ export default async (req) => {
       await generateDocs(supabase, sessionId, messages, aiConfig, fallbackCandidates);
     }
 
-    await supabase
+    const { data: currentSession } = await supabase
       .from('sessions')
-      .update({ updated_at: new Date().toISOString(), generation_status: 'completed' })
-      .eq('id', sessionId);
+      .select('generation_status')
+      .eq('id', sessionId)
+      .single();
+
+    if (currentSession?.generation_status !== 'cancelled') {
+      await supabase
+        .from('sessions')
+        .update({ updated_at: new Date().toISOString(), generation_status: 'completed' })
+        .eq('id', sessionId);
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
@@ -895,10 +918,17 @@ export default async (req) => {
   } catch (err) {
     const errorMsg = err.message || 'Unknown error';
     try {
-      await supabase
+      const { data: currentSession } = await supabase
         .from('sessions')
-        .update({ updated_at: new Date().toISOString(), generation_status: 'failed', generation_error: errorMsg })
-        .eq('id', sessionId);
+        .select('generation_status')
+        .eq('id', sessionId)
+        .single();
+      if (currentSession?.generation_status !== 'cancelled') {
+        await supabase
+          .from('sessions')
+          .update({ updated_at: new Date().toISOString(), generation_status: 'failed', generation_error: errorMsg })
+          .eq('id', sessionId);
+      }
     } catch {}
 
     return new Response(JSON.stringify({ success: false, error: errorMsg }), {

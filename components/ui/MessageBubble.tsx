@@ -73,10 +73,10 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+        className={`max-w-[80%] rounded-md px-4 py-3 ${
           isUser
-            ? 'rounded-br-sm bg-gradient-to-br from-gemini-blue to-gemini-green text-white shadow-[0_0_20px_rgba(59,130,246,0.15)]'
-            : 'rounded-bl-sm px-4 py-3 ai-glow-slow text-primary'
+            ? 'rounded-br-sm bg-gemini-blue text-white '
+            : 'rounded-bl-sm px-4 py-3 brutal-panel text-primary'
         }`}
       >
         <Attachments attachments={message.attachments || []} />

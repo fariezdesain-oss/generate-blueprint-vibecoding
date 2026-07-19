@@ -3,7 +3,7 @@
 import { memo, useEffect, useRef } from 'react';
 import { useChatStore } from '@/store/useChatStore';
 import { MessageBubble } from './MessageBubble';
-import { Sparkles } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 
 export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadingMessages?: boolean }) {
   const messages = useChatStore((s) => s.messages);
@@ -38,11 +38,11 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center gap-3 sm:gap-4">
-          <div className="size-10 sm:size-12 lg:size-16 rounded-2xl bg-tertiary flex items-center justify-center">
-            <div className="size-4 rounded-full border-2 border-white/20 border-t-gemini-blue animate-spin" />
+          <div className="size-10 sm:size-12 lg:size-16 rounded-md bg-tertiary flex items-center justify-center">
+            <Wand2 className="size-4 animate-wand-swing text-gemini-blue" />
           </div>
           <div className="text-center">
-            <h2 className="text-gradient text-sm sm:text-base lg:text-lg font-semibold">Memuat Percakapan</h2>
+            <h2 className="font-display text-primary text-sm sm:text-base lg:text-lg font-semibold">Memuat Percakapan</h2>
             <p className="mt-1 text-xs sm:text-sm text-tertiary">Sabar sebentar...</p>
           </div>
         </div>
@@ -53,12 +53,12 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
   if (messages.length === 0 && !isGenerating) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <div className="flex flex-col items-center gap-3 sm:gap-4 animate-float">
-          <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/10 to-gemini-blue/10 ring-1 ring-[var(--border)]">
-            <Sparkles className="size-6 sm:size-8 text-gemini-blue" />
+        <div className="flex flex-col items-center gap-3 sm:gap-4 ">
+          <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-md bg-gemini-blue border-2 border-subtle">
+            <Wand2 className="size-6 sm:size-8 text-white" />
           </div>
           <div className="text-center">
-            <h2 className="text-gradient text-sm sm:text-base lg:text-lg font-semibold">Mulai Percakapan</h2>
+            <h2 className="font-display text-primary text-sm sm:text-base lg:text-lg font-semibold">Mulai Percakapan</h2>
             <p className="mt-1 text-xs sm:text-sm text-tertiary">Tanyakan sesuatu untuk memulai</p>
           </div>
         </div>
@@ -75,10 +75,10 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
 
         {isGenerating && streamingContent && (
           <div className="flex justify-start animate-fade-in">
-            <div className="max-w-[80%] rounded-2xl rounded-bl-sm px-4 py-3 ai-glow">
+            <div className="max-w-[80%] rounded-md rounded-bl-sm px-4 py-3 brutal-panel">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-primary">
                 {streamingContent}
-                <span className="inline-block size-1.5 animate-pulse rounded-full bg-gemini-blue ml-0.5 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+                <span className="inline-block size-1.5 animate-pulse rounded-full bg-gemini-blue ml-0.5 " />
               </p>
             </div>
           </div>
@@ -86,7 +86,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
 
         {isGenerating && !streamingContent && (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-sm px-4 py-4 ai-glow">
+            <div className="rounded-md rounded-bl-sm px-4 py-4 brutal-panel">
               <div className="flex gap-1.5">
                 <span className="typing-dot" />
                 <span className="typing-dot" />

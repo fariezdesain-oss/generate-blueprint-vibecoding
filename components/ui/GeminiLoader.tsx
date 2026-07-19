@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Wand2 } from 'lucide-react';
 
 const loadingTexts = [
   'Memproses...',
@@ -18,25 +19,22 @@ export function GeminiLoader({ text }: { text?: string }) {
   }, []);
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex items-center gap-1.5">
-        <span className="typing-dot" />
-        <span className="typing-dot" />
-        <span className="typing-dot" />
+    <div className="flex flex-col items-center gap-4">
+      <div className="brutal-icon size-12 sm:size-14 rounded-md bg-gemini-orange">
+        <Wand2 className="size-6 sm:size-7 text-[#111] animate-wand-swing" />
       </div>
-      <p className="text-xs text-tertiary">
+      <p className="font-bold text-sm tracking-widest uppercase text-tertiary">
         {text || loadingTexts[textIndex]}
       </p>
     </div>
   );
 }
 
+// Digunakan sebagai loader kecil (inline) di dalam tombol dsb
 export function GeminiDots() {
   return (
-    <span className="inline-flex items-center gap-0.5" style={{ color: 'var(--text-tertiary)' }}>
-      <span className="inline-block size-1 rounded-full bg-current animate-bounce-dot" style={{ animationDelay: '-0.32s' }} />
-      <span className="inline-block size-1 rounded-full bg-current animate-bounce-dot" style={{ animationDelay: '-0.16s' }} />
-      <span className="inline-block size-1 rounded-full bg-current animate-bounce-dot" style={{ animationDelay: '0s' }} />
+    <span className="inline-flex items-center justify-center">
+      <Wand2 size={16} className="animate-wand-swing" />
     </span>
   );
 }

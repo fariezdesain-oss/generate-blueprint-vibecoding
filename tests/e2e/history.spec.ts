@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test.beforeEach(() => {
-  test.skip(!process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD, 'E2E_TEST_EMAIL dan E2E_TEST_PASSWORD tidak tersedia; protected E2E tests dilewati.');
+  test.skip(!process.env.E2E_TEST_EMAIL || !process.env.E2E_TEST_PASSWORD, '...');
 });
 
 test('history menampilkan empty state', async ({ page }) => {
@@ -10,7 +10,7 @@ test('history menampilkan empty state', async ({ page }) => {
   });
 
   await page.goto('/history');
-  await expect(page.getByRole('heading', { name: 'History' })).toBeVisible();
+  await expect(page.getByTestId('history-heading')).toBeVisible();
   await expect(page.getByText('Belum ada sesi')).toBeVisible();
 });
 
@@ -20,16 +20,14 @@ test('history menampilkan sesi dan klik navigasi ke chat', async ({ page }) => {
       json: {
         success: true,
         data: {
-          sessions: [
-            {
-              id: 'ses_e2e_history',
-              title: 'Sesi E2E History',
-              created_at: '2026-07-18T00:00:00.000Z',
-              mode: 'docs',
-              has_generated: false,
-              has_n8n: false,
-            },
-          ],
+          sessions: [{
+            id: 'ses_e2e_history',
+            title: 'Sesi E2E History',
+            created_at: '2026-07-18T00:00:00.000Z',
+            mode: 'docs',
+            has_generated: false,
+            has_n8n: false,
+          }],
         },
       },
     });
@@ -39,6 +37,6 @@ test('history menampilkan sesi dan klik navigasi ke chat', async ({ page }) => {
   });
 
   await page.goto('/history');
-  await page.getByText('Sesi E2E History').click();
+  await page.getByTestId('session-item').first().click();
   await expect(page).toHaveURL(/\/chat\?id=ses_e2e_history/);
 });

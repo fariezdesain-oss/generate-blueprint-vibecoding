@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, FileJson, X } from 'lucide-react';
+import { ChevronRight, FileJson, X , Wand2} from 'lucide-react';
 import type { ProjectState } from '@/lib/utils/projectState';
 
 interface ProjectStatePanelProps {
@@ -55,19 +55,17 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
   if (!isOpen) {
     return (
       <>
-        {/* Desktop floating button */}
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 bg-tertiary border border-subtle border-r-0 rounded-l-xl p-2.5 text-tertiary hover:text-primary transition-all shadow-lg hover:shadow-xl hidden md:block z-40"
+          className="absolute right-0 top-1/2 -translate-y-1/2 bg-tertiary border border-subtle border-r-0 rounded-l-xl p-2.5 text-tertiary hover:text-primary transition-all shadow-[var(--shadow)]  hidden md:block z-40"
           title="Buka Project State"
         >
           <FileJson size={20} />
         </button>
         
-        {/* Mobile floating button (bottom right, above input area) */}
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute right-4 bottom-24 bg-gemini-blue text-white rounded-full p-3 shadow-lg hover:shadow-xl md:hidden z-40 animate-fade-in-up"
+          className="absolute right-4 bottom-24 bg-gemini-blue text-white rounded-full p-3 shadow-[var(--shadow)]  md:hidden z-40 animate-fade-in-up"
           title="Buka Project State"
         >
           <FileJson size={20} />
@@ -101,9 +99,9 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
     <>
       <div className="flex items-center justify-between p-4 border-b border-subtle shrink-0">
         <h2 className="font-bold text-primary flex items-center gap-2 text-sm">
-          <FileJson size={18} className="text-gemini-blue" />
+          <FileJson size={18} className="text-secondary" />
           Project State
-          {isRefreshing && <span className="size-3 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin ml-2" />}
+          {isRefreshing && <Wand2 className="size-3 animate-wand-swing text-gemini-blue ml-2" />}
         </h2>
         <button
           onClick={() => setIsOpen(false)}
@@ -161,13 +159,13 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
     <>
       {/* Mobile Backdrop */}
       <div 
-        className="fixed inset-0 bg-overlay/50 backdrop-blur-sm z-40 md:hidden animate-fade-in"
+        className="fixed inset-0 bg-overlay/50 z-40 md:hidden animate-fade-in"
         onClick={() => setIsOpen(false)}
       />
       
       {/* Desktop Sidebar & Mobile Bottom Sheet */}
       <div className={`
-        fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-secondary rounded-t-3xl border-t border-subtle shadow-2xl transition-transform duration-300 transform translate-y-0
+        fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-secondary rounded-t-3xl border-t border-subtle shadow-[var(--shadow)] transition-transform duration-300 transform translate-y-0
         md:relative md:inset-auto md:h-full md:w-80 md:rounded-none md:border-t-0 md:border-l md:shadow-none md:translate-y-0 md:flex md:z-auto
       `}>
         {/* Mobile Pull Indicator */}

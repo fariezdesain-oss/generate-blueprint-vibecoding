@@ -4,30 +4,25 @@ import { useEffect, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Sun, Moon } from 'lucide-react';
 
-export function ThemeToggle() {
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
 
-  if (!mounted) {
-    return (
-      <button className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-tertiary">
-        <div className="size-4 shrink-0" />
-        <span>Theme</span>
-      </button>
-    );
-  }
-
-  const isDark = theme === 'dark';
+  const isDark = mounted && theme === 'dark';
+  const label = isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap';
 
   return (
     <button
-      onClick={() => setTheme(isDark ? 'light' : 'dark')}
-      className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-tertiary transition-all duration-200 hover:text-primary"
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={() => mounted && setTheme(isDark ? 'light' : 'dark')}
+      className={`brutal-button !bg-gemini-orange flex items-center justify-center gap-2.5 px-3 text-sm ${compact ? 'size-11 p-0' : 'w-full'}`}
     >
-      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-      <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      {!compact && <span>{isDark ? 'Mode Terang' : 'Mode Gelap'}</span>}
     </button>
   );
 }

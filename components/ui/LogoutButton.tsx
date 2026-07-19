@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { LogOut } from 'lucide-react';
+import { LogOut, Wand2 } from 'lucide-react';
 import { clearActiveChatSession } from '@/lib/utils/browserSession';
 import { useChatStore } from '@/store/useChatStore';
 
@@ -27,14 +27,14 @@ export function LogoutButton() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="brutal-button flex w-full items-center justify-center gap-2.5 rounded-md px-3 py-2 text-sm !border-gemini-red !text-gemini-red !bg-transparent hover:!bg-gemini-red hover:!text-white dark:hover:!text-black !shadow-[3px_3px_0_var(--gemini-red)] hover:!shadow-[3px_3px_0_#111] dark:hover:!shadow-[3px_3px_0_#fff] active:!shadow-[1px_1px_0_#111] dark:active:!shadow-[1px_1px_0_#fff] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? (
-        <span className="size-4 rounded-full border-2 border-red-400/50 border-t-red-400 animate-spin" />
+        <Wand2 size={16} className="animate-wand-swing" />
       ) : (
         <LogOut size={16} />
       )}
-      <span>{loading ? 'Logging out...' : 'Logout'}</span>
+      <span>{loading ? 'Keluar...' : 'Keluar'}</span>
     </button>
   );
 }

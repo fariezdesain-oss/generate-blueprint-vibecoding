@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Eye, EyeOff, Sparkles, Mail } from 'lucide-react';
+import { Eye, EyeOff, Wand2, Mail } from 'lucide-react';
 import { createClient } from '@/lib/db/supabaseBrowserClient';
 import { GeminiDots } from '@/components/ui/GeminiLoader';
 
@@ -99,26 +99,26 @@ function LoginForm() {
     return (
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
         <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-          <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+          <div className="brutal-card rounded-md p-4 sm:p-6 lg:p-8 shadow-[var(--shadow)]">
             <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
-              <div className="mx-auto mb-3 sm:mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/20 ring-1 ring-white/10">
-                <Mail className="size-5 sm:size-6 lg:size-7 text-gemini-blue" />
+              <div className="brutal-icon mx-auto mb-3 sm:mb-4 size-10 sm:size-12 lg:size-14 rounded-md bg-gemini-orange">
+                <Mail className="size-5 sm:size-6 lg:size-7 text-white" />
               </div>
-              <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">Email Belum Diverifikasi</h1>
-              <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-white/40">
+              <h1 className="font-display text-primary text-lg sm:text-xl lg:text-2xl font-bold">Email Belum Diverifikasi</h1>
+              <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-tertiary">
                 Silakan cek email Anda untuk verifikasi:
               </p>
-              <p className="mt-1 text-xs sm:text-sm font-medium text-white/80 truncate">{unconfirmedEmail}</p>
+              <p className="mt-1 text-xs sm:text-sm font-medium text-primary truncate">{unconfirmedEmail}</p>
             </div>
 
-            <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-4 text-sm text-white/60">
+            <div className="rounded-xl bg-tertiary border border-subtle px-4 py-4 text-sm text-secondary">
               Klik link yang kami kirim ke email Anda untuk mengaktifkan akun. Jika tidak muncul, periksa folder <strong>Spam</strong>.
             </div>
 
             <button
               onClick={handleResend}
               disabled={resendLoading || resendCooldown > 0}
-              className="btn-gradient-google w-full mt-6 py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
+              className="brutal-button mt-6 flex w-full items-center justify-center gap-2 py-2.5 text-sm sm:py-3"
             >
               {resendLoading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -146,7 +146,7 @@ function LoginForm() {
               </div>
             )}
 
-            <p className="mt-6 text-center text-sm text-white/40">
+            <p className="mt-6 text-center text-sm text-tertiary">
               Gunakan email lain?{' '}
               <button
                 onClick={() => setUnconfirmedEmail(null)}
@@ -164,13 +164,13 @@ function LoginForm() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-        <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+        <div className="brutal-card rounded-md p-4 sm:p-6 lg:p-8 shadow-[var(--shadow)]">
           <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
-            <div className="mx-auto mb-3 sm:mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-blue/20 ring-1 ring-white/10">
-              <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-blue" />
+            <div className="brutal-icon mx-auto mb-3 sm:mb-4 size-10 sm:size-12 lg:size-14 rounded-md bg-gemini-orange">
+              <Wand2 className="size-5 sm:size-6 lg:size-7 text-[#111]" />
             </div>
-            <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">Vibecoding Docs</h1>
-            <p className="mt-1 text-xs sm:text-sm text-white/40">Masuk ke akun Anda</p>
+                <h1 data-testid="login-heading" className="font-display text-primary text-lg sm:text-xl lg:text-2xl font-bold">Vibecoding Docs</h1>
+            <p className="mt-1 text-xs sm:text-sm text-tertiary">Masuk ke akun Anda</p>
           </div>
 
           {message && (
@@ -187,32 +187,32 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="space-y-3 sm:space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm text-white/60">Email</label>
+              <label className="mb-1.5 block text-sm text-secondary">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="input-gemini"
+                className="input-gemini input-email"
                 placeholder="nama@email.com"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm text-white/60">Password</label>
+              <label className="mb-1.5 block text-sm text-secondary">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="input-gemini pr-10"
+                  className="input-gemini input-password pr-10"
                   placeholder="••••••••"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-gemini-blue transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-tertiary hover:text-gemini-blue transition-colors"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -228,8 +228,9 @@ function LoginForm() {
                 </a>
               </div>
 
-            <button
-              type="submit"
+                  <button
+                    data-testid="login-submit"
+                    type="submit"
               disabled={loading}
               className="btn-gradient-google w-full py-2.5 sm:py-3 text-sm font-semibold flex items-center justify-center gap-2"
             >
@@ -244,7 +245,7 @@ function LoginForm() {
             </button>
           </form>
 
-          <p className="mt-4 sm:mt-5 lg:mt-6 text-center text-xs sm:text-sm text-white/40">
+          <p className="mt-4 sm:mt-5 lg:mt-6 text-center text-xs sm:text-sm text-tertiary">
             Belum punya akun?{' '}
             <a
               href="/register"
@@ -263,7 +264,7 @@ export default function LoginPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-white/40">Memuat...</div>
+        <div className="text-tertiary">Memuat...</div>
       </div>
     }>
       <LoginForm />

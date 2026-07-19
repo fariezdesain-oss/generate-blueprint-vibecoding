@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Eye, EyeOff, Sparkles, Loader } from 'lucide-react';
+import { Eye, EyeOff, Wand2 } from 'lucide-react';
 import { createClient } from '@/lib/db/supabaseBrowserClient';
 import { GeminiDots } from '@/components/ui/GeminiLoader';
 
@@ -84,13 +84,13 @@ export default function UpdatePasswordPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden">
       <div className="animate-fade-in-up relative z-10 mx-4 w-full max-w-sm">
-        <div className="glass rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+        <div className="brutal-card rounded-md p-4 sm:p-6 lg:p-8 shadow-[var(--shadow)]">
           <div className="mb-4 sm:mb-6 lg:mb-8 text-center">
-            <div className="mx-auto mb-3 sm:mb-4 flex size-10 sm:size-12 lg:size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-gemini-blue/20 to-gemini-teal/20 ring-1 ring-white/10">
-              <Sparkles className="size-5 sm:size-6 lg:size-7 text-gemini-blue" />
+            <div className="brutal-icon mx-auto mb-3 sm:mb-4 size-10 sm:size-12 lg:size-14 rounded-md bg-gemini-orange">
+              <Wand2 className="size-5 sm:size-6 lg:size-7 text-[#111]" />
             </div>
-            <h1 className="text-gradient text-lg sm:text-xl lg:text-2xl font-bold">Reset Password</h1>
-            <p className="mt-1 text-xs sm:text-sm text-white/40">
+            <h1 className="font-display text-primary text-lg sm:text-xl lg:text-2xl font-bold">Reset Password</h1>
+            <p className="mt-1 text-xs sm:text-sm text-tertiary">
               {success
                 ? 'Password berhasil diubah'
                 : 'Masukkan password baru Anda'}
@@ -106,7 +106,7 @@ export default function UpdatePasswordPage() {
           {success ? (
             <div className="space-y-4">
               <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-4">
-                <p className="text-center text-sm text-emerald-300">
+                <p className="text-center text-sm text-emerald-600 dark:text-emerald-300">
                   Password Anda berhasil diubah. Klik tombol di bawah untuk kembali.
                 </p>
               </div>
@@ -120,7 +120,7 @@ export default function UpdatePasswordPage() {
           ) : ready ? (
             <form onSubmit={handleUpdate} className="space-y-3 sm:space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm text-white/60">Password Baru</label>
+                <label className="mb-1.5 block text-sm text-secondary">Password Baru</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -134,7 +134,7 @@ export default function UpdatePasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-gemini-blue transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-tertiary hover:text-gemini-blue transition-colors"
                   >
                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
@@ -142,14 +142,14 @@ export default function UpdatePasswordPage() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm text-white/60">Konfirmasi Password</label>
+                <label className="mb-1.5 block text-sm text-secondary">Konfirmasi Password</label>
                 <input
                   type="password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   required
                   minLength={6}
-                  className="input-gemini"
+                  className="input-gemini input-password"
                   placeholder="Ulangi password baru"
                 />
               </div>
@@ -170,8 +170,8 @@ export default function UpdatePasswordPage() {
             </form>
           ) : (
             <div className="flex flex-col items-center gap-4 py-6 sm:py-8">
-              <Loader size={24} className="animate-spin text-gemini-blue" />
-              <p className="text-sm text-white/40">Memverifikasi link reset...</p>
+              <Wand2 size={24} className="animate-wand-swing text-gemini-blue" />
+              <p className="text-sm text-tertiary">Memverifikasi link reset...</p>
             </div>
           )}
         </div>

@@ -9,85 +9,39 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-inter)'],
+        display: ['var(--font-space-grotesk)'],
+      },
       colors: {
-        surface: '#111827',
+        surface: 'var(--bg-secondary)',
         accent: {
-          DEFAULT: '#10B981',
-          light: '#34D399',
-          dark: '#059669',
+          DEFAULT: 'var(--gemini-green)',
+          light: 'var(--gemini-green)',
+          dark: 'var(--gemini-green)',
         },
         gemini: {
-          blue: '#3b82f6',
-          red: '#EA4335',
-          orange: '#FBBC05',
-          green: '#34A853',
-          teal: '#14b8a6',
+          blue: 'var(--gemini-blue)',
+          red: 'var(--gemini-red)',
+          orange: 'var(--gemini-orange)',
+          green: 'var(--gemini-green)',
+          teal: 'var(--gemini-teal)',
+          purple: 'var(--gemini-purple)',
         },
       },
       animation: {
-        'gradient-x': 'gradient-x 15s ease infinite',
-        'gradient-y': 'gradient-y 15s ease infinite',
-        'gradient-xy': 'gradient-xy 15s ease infinite',
-        'gradient-shift': 'gradient-shift 3s ease infinite',
-        'gradient-shift-slow': 'gradient-shift 6s ease infinite',
-        'float': 'float 6s ease-in-out infinite',
-        'float-delayed': 'float 6s ease-in-out 3s infinite',
-        'glow': 'glow 2s ease-in-out infinite alternate',
-        'glow-pulse': 'glow-pulse 3s ease-in-out infinite',
-        'shimmer': 'shimmer 2s linear infinite',
-        'orb-1': 'orb-1 25s ease-in-out infinite',
-        'fade-in-up': 'fade-in-up 0.6s ease-out forwards',
-        'fade-in': 'fade-in 0.5s ease-out forwards',
-        'slide-in-right': 'slide-in-right 0.3s ease-out',
+        'fade-in-up': 'fade-in-up 0.3s ease-out forwards',
+        'fade-in': 'fade-in 0.25s ease-out forwards',
+        'slide-in-right': 'slide-in-right 0.25s ease-out',
         'bounce-dot': 'bounce-dot 1.4s infinite ease-in-out both',
+        'wand-swing': 'wand-swing 1.5s ease-in-out infinite',
       },
       keyframes: {
-        'gradient-x': {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
-        'gradient-y': {
-          '0%, 100%': { backgroundPosition: '50% 0%' },
-          '50%': { backgroundPosition: '50% 100%' },
-        },
-        'gradient-xy': {
-          '0%, 100%': { backgroundPosition: '0% 0%' },
-          '50%': { backgroundPosition: '100% 100%' },
-        },
-        'gradient-shift': {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
-        'float': {
-          '0%, 100%': { transform: 'translateY(0px)' },
-          '50%': { transform: 'translateY(-20px)' },
-        },
-        'glow': {
-          '0%': { boxShadow: '0 0 5px rgba(59,130,246,0.2), 0 0 20px rgba(59,130,246,0.1)' },
-          '100%': { boxShadow: '0 0 10px rgba(59,130,246,0.4), 0 0 40px rgba(59,130,246,0.2)' },
-        },
-        'glow-pulse': {
-          '0%, 100%': { opacity: '0.4' },
-          '50%': { opacity: '1' },
-        },
-        'shimmer': {
-          '0%': { transform: 'translateX(-100%)' },
-          '100%': { transform: 'translateX(100%)' },
-        },
-        'orb-1': {
-          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-          '25%': { transform: 'translate(20px, -30px) scale(1.1)' },
-          '50%': { transform: 'translate(-10px, 20px) scale(0.9)' },
-          '75%': { transform: 'translate(30px, 10px) scale(1.05)' },
-        },
         'fade-in-up': {
-          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
         },
-        'fade-in': {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
-        },
+        'fade-in': { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
         'slide-in-right': {
           '0%': { transform: 'translateX(100%)', opacity: '0' },
           '100%': { transform: 'translateX(0)', opacity: '1' },
@@ -96,10 +50,10 @@ const config: Config = {
           '0%, 80%, 100%': { transform: 'scale(0)' },
           '40%': { transform: 'scale(1)' },
         },
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        'wand-swing': {
+          '0%, 100%': { transform: 'rotate(-25deg)' },
+          '50%': { transform: 'rotate(25deg)' },
+        },
       },
     },
   },

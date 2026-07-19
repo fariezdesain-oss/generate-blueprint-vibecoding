@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pencil, Play, Power, Trash2 } from 'lucide-react';
+import { Pencil, Play, Power, Trash2, Wand2 } from 'lucide-react';
 
 interface ProviderItem {
   id: string;
@@ -36,6 +36,7 @@ export function ProviderSelector() {
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
   const [editingMaskedKey, setEditingMaskedKey] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showFormModal, setShowFormModal] = useState(false);
 
   const fetchingRef = useRef(false);
   const fetchProviders = useCallback(async () => {
@@ -147,6 +148,7 @@ export function ProviderSelector() {
         setForm({ ...EMPTY_FORM });
         setEditingProviderId(null);
         setEditingMaskedKey('');
+        setShowFormModal(false);
       }
     }
 
@@ -162,12 +164,14 @@ export function ProviderSelector() {
     });
     setEditingProviderId(p.id);
     setEditingMaskedKey(p.masked_api_key || '');
+    setShowFormModal(true);
   };
 
   const cancelEdit = () => {
     setEditingProviderId(null);
     setEditingMaskedKey('');
     setForm({ ...EMPTY_FORM });
+    setShowFormModal(false);
   };
 
   const preventSecretCopy = (e: React.SyntheticEvent) => {
@@ -204,8 +208,8 @@ export function ProviderSelector() {
 
   if (pageLoading && providers.length === 0) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="size-6 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+      <div className="flex flex-1 items-center justify-center py-12">
+        <Wand2 className="size-6 animate-wand-swing text-gemini-blue" />
       </div>
     );
   }
@@ -213,32 +217,36 @@ export function ProviderSelector() {
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
       {notification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className={`animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-5 sm:p-6 text-center shadow-2xl ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className={`animate-fade-in-up mx-4 w-full max-w-sm brutal-card !rounded-none p-6 sm:p-8 text-center !shadow-[6px_6px_0_var(--border)] ${
             notification.type === 'success'
-              ? 'border-emerald-500/20'
-              : 'border-red-500/20'
+              ? 'border-emerald-500'
+              : 'border-gemini-red'
           }`}>
-            <div className={`mx-auto mb-3 sm:mb-4 flex size-12 sm:size-14 items-center justify-center rounded-full ring-1 ${
-              notification.type === 'success' ? 'bg-emerald-500/10 ring-emerald-500/20' : 'bg-red-500/10 ring-red-500/20'
+            <div className={`mx-auto mb-4 flex size-14 items-center justify-center !rounded-none border-2 border-border ${
+              notification.type === 'success' ? 'bg-emerald-500/20' : 'bg-gemini-red/20'
             }`}>
               {notification.type === 'success' ? (
-                <svg className="size-5 sm:size-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <svg className="size-7 text-emerald-500 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               ) : (
-                <svg className="size-5 sm:size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg className="size-7 text-[#111] dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               )}
             </div>
-            <p className={`text-xs sm:text-sm ${notification.type === 'success' ? 'text-emerald-300' : 'text-secondary'}`}>
+            <h3 className="mb-2 text-xl font-black uppercase tracking-widest text-primary text-center">
+              {notification.type === 'success' ? 'Berhasil' : 'Gagal'}
+            </h3>
+            <div className="mx-auto mb-6 mt-2 h-[2px] w-16 bg-border" />
+            <p className={`mb-6 text-sm font-bold ${notification.type === 'success' ? 'text-emerald-600 dark:text-emerald-300' : 'text-gemini-red'}`}>
               {notification.message}
             </p>
             <button
               onClick={() => setNotification(null)}
-              className={`mt-4 sm:mt-5 w-full rounded-xl py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white transition-all duration-200 ${
-                notification.type === 'success' ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-red-500 hover:bg-red-400'
+              className={`w-full !rounded-none border-2 border-border py-2.5 sm:py-3 text-sm font-black uppercase text-white transition-all duration-200 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] ${
+                notification.type === 'success' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-gemini-red hover:bg-gemini-red/90'
               }`}
             >
               OK
@@ -248,7 +256,25 @@ export function ProviderSelector() {
       )}
 
       <div className="space-y-4">
-        <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">Configured Providers</h2>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">Configured Providers</h2>
+          <button
+            onClick={() => {
+              setEditingProviderId(null);
+              setForm({ ...EMPTY_FORM });
+              setEditingMaskedKey('');
+              setShowFormModal(true);
+            }}
+            className="brutal-button !rounded-none !min-h-10 px-4 py-2 text-xs font-bold uppercase"
+          >
+            <span className="flex items-center gap-2">
+              <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Provider
+            </span>
+          </button>
+        </div>
 
         {providers.length === 0 && (
           <p className="text-sm text-tertiary">
@@ -256,84 +282,80 @@ export function ProviderSelector() {
           </p>
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {providers.map((p) => (
             <div
               key={p.id}
-              className={`card-gemini flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4 ${
-                p.is_active ? 'card-gemini-active' : ''
+              className={`brutal-card !rounded-none flex flex-col md:flex-row md:items-center justify-between px-4 py-4 sm:px-6 sm:py-5 !shadow-[4px_4px_0_var(--border)] ${
+                p.is_active ? 'border-gemini-blue !shadow-[4px_4px_0_var(--gemini-blue)]' : ''
               }`}
             >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-primary">
+                <div className="mb-4 md:mb-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-black text-lg text-primary uppercase tracking-wide">
                       {PROVIDER_OPTIONS.find((o) => o.value === p.provider_name)?.label ||
                         p.provider_name}
                     </span>
                     {p.is_active && (
-                      <span className="rounded-full bg-gradient-to-r from-gemini-blue/20 to-gemini-blue/20 px-2 py-0.5 text-[10px] font-medium text-gemini-blue">
+                      <span className="!rounded-none border-2 border-border bg-gemini-blue px-2 py-0.5 text-[10px] font-black text-white shadow-[2px_2px_0_var(--border)]">
                         ACTIVE
                       </span>
                     )}
                   </div>
-                  <p className="mt-0.5 text-xs text-tertiary">
-                    Model: {p.model_name}
-                  </p>
-                  {p.context_level && (
-                    <p className="mt-1 text-[11px] text-tertiary">
-                      Generate mode: <span className="font-medium text-secondary">{p.context_level.toUpperCase()} CONTEXT</span>
+                  <div className="border-l-4 border-gemini-orange pl-3 py-1 bg-tertiary/50 mt-2">
+                    <p className="text-xs font-bold text-secondary">
+                      MODEL: <span className="font-mono font-medium text-primary">{p.model_name}</span>
                     </p>
-                  )}
-                  <p className="mt-0.5 text-[11px] text-tertiary">
-                    API Key:{' '}
-                    <span
-                      className="select-none font-mono"
-                      onCopy={preventSecretCopy}
-                      onCut={preventSecretCopy}
-                      onContextMenu={preventSecretCopy}
-                    >
-                      {p.masked_api_key || (p.has_api_key ? 'Tersimpan di server' : 'Belum disimpan')}
-                    </span>
-                  </p>
+                    {p.context_level && (
+                      <p className="text-[11px] font-bold text-secondary mt-1">
+                        MODE: <span className="font-mono font-medium text-primary">{p.context_level.toUpperCase()} CONTEXT</span>
+                      </p>
+                    )}
+                    <p className="mt-1 text-[11px] font-bold text-secondary">
+                      KEY: <span className="font-mono font-medium text-primary select-none" onCopy={preventSecretCopy} onCut={preventSecretCopy} onContextMenu={preventSecretCopy}>
+                        {p.masked_api_key || (p.has_api_key ? 'Tersimpan di server' : 'Belum disimpan')}
+                      </span>
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1 sm:gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => handleEdit(p)}
-                    className="rounded-xl border border-subtle px-1.5 sm:px-2.5 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 !rounded-none border-2 border-border bg-secondary px-3 py-2 text-xs font-bold uppercase text-primary transition-all duration-200 hover:bg-tertiary shadow-[2px_2px_0_var(--border)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)]"
                   >
-                    <Pencil className="size-3 sm:size-3.5 sm:hidden" />
-                    <span className="hidden sm:inline">Edit</span>
+                    <Pencil className="size-3.5" />
+                    <span>Edit</span>
                   </button>
                   <button
                     onClick={() => handleTestSaved(p.id)}
                     disabled={testingProviderId === p.id}
-                    className="rounded-xl border border-subtle px-1.5 sm:px-2.5 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary disabled:opacity-30"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 !rounded-none border-2 border-border bg-gemini-orange px-3 py-2 text-xs font-black uppercase text-[#111] transition-all duration-200 hover:bg-gemini-orange/90 shadow-[2px_2px_0_var(--border)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {testingProviderId === p.id ? (
-                      <span className="size-3 sm:size-3.5 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
+                      <Wand2 className="size-3.5 animate-wand-swing" />
                     ) : (
                       <>
-                        <Play className="size-3 sm:size-3.5 sm:hidden" />
-                        <span className="hidden sm:inline">Test</span>
+                        <Play className="size-3.5" />
+                        <span>Test</span>
                       </>
                     )}
                   </button>
                 {!p.is_active && (
                   <button
                     onClick={() => handleActivate(p.id)}
-                    className="rounded-xl bg-gradient-to-r from-gemini-blue to-gemini-blue px-1.5 sm:px-2.5 lg:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-white transition-all duration-200 hover:shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                    className="flex-1 md:flex-none flex items-center justify-center gap-1.5 !rounded-none border-2 border-border bg-gemini-blue px-3 py-2 text-xs font-black uppercase text-white transition-all duration-200 hover:bg-gemini-blue/90 shadow-[2px_2px_0_var(--border)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)]"
                   >
-                    <Power className="size-3 sm:size-3.5 sm:hidden" />
-                    <span className="hidden sm:inline">Activate</span>
+                    <Power className="size-3.5" />
+                    <span>Aktifkan</span>
                   </button>
                 )}
                 <button
                   onClick={() => handleDelete(p.id)}
-                    className="rounded-xl bg-red-500/10 px-1.5 sm:px-2.5 lg:px-3 py-1.5 md:py-1.5 text-[11px] sm:text-xs font-medium text-red-400 transition-all duration-200 hover:bg-red-500/20 border border-red-500/20"
+                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 !rounded-none border-2 border-border bg-gemini-red px-3 py-2 text-xs font-black uppercase text-white transition-all duration-200 hover:bg-gemini-red/90 shadow-[2px_2px_0_var(--border)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)]"
                 >
-                    <Trash2 className="size-3 sm:size-3.5 sm:hidden" />
-                    <span className="hidden sm:inline">Delete</span>
+                    <Trash2 className="size-3.5" />
+                    <span>Hapus</span>
                 </button>
               </div>
             </div>
@@ -341,131 +363,136 @@ export function ProviderSelector() {
         </div>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-4 card-gemini p-4 sm:p-6">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm sm:text-base lg:text-lg font-semibold text-primary">
-            {editingProviderId ? 'Edit Provider' : 'Add Provider'}
-          </h2>
-          {editingProviderId && (
-            <button
-              type="button"
-              onClick={cancelEdit}
-              className="rounded-xl border border-subtle px-3 py-1.5 text-xs font-medium text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-secondary"
-            >
-              Cancel
-            </button>
-          )}
-        </div>
+      {showFormModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="animate-fade-in-up w-full max-w-lg brutal-card !rounded-none bg-secondary p-6 sm:p-8 !shadow-[6px_6px_0_var(--border)] overflow-y-auto max-h-[90vh]">
+            <h3 className="mb-2 text-xl font-black uppercase tracking-widest text-primary text-center">
+              {editingProviderId ? 'Edit Provider' : 'Add Provider'}
+            </h3>
+            <div className="mx-auto mb-6 mt-2 h-[2px] w-16 bg-border" />
+            
+            <form onSubmit={handleSave} className="space-y-4 text-left">
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-secondary">Provider</label>
+                <select
+                  value={form.provider_name}
+                  onChange={(e) => setForm({ ...EMPTY_FORM, provider_name: e.target.value })}
+                  disabled={!!editingProviderId}
+                  className="input-gemini"
+                >
+                  {PROVIDER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm text-secondary">Provider</label>
-          <select
-            value={form.provider_name}
-            onChange={(e) => setForm({ ...EMPTY_FORM, provider_name: e.target.value })}
-            disabled={!!editingProviderId}
-            className="input-gemini"
-          >
-            {PROVIDER_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-secondary">Model</label>
+                <input
+                  type="text"
+                  value={form.model_name}
+                  onChange={(e) => setForm({ ...form, model_name: e.target.value })}
+                  placeholder="Ketik nama model secara manual (contoh: gemini-2.5-flash, dll)"
+                  required
+                  className="input-gemini"
+                />
+              </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm text-secondary">Model</label>
-          <input
-            type="text"
-            value={form.model_name}
-            onChange={(e) => setForm({ ...form, model_name: e.target.value })}
-            placeholder="Ketik nama model secara manual (contoh: gemini-2.5-flash, gpt-4o, dll)"
-            required
-            className="input-gemini"
-          />
-        </div>
+              {form.provider_name === 'custom' && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-bold text-secondary">Base URL</label>
+                  <input
+                    type="text"
+                    value={form.base_url}
+                    onChange={(e) => setForm({ ...form, base_url: e.target.value })}
+                    placeholder="https://api.openai.com/v1"
+                    className="input-gemini"
+                  />
+                </div>
+              )}
 
-        {form.provider_name === 'custom' && (
-          <div>
-            <label className="mb-1.5 block text-sm text-secondary">Base URL</label>
-            <input
-              type="text"
-              value={form.base_url}
-              onChange={(e) => setForm({ ...form, base_url: e.target.value })}
-              placeholder="https://api.openai.com/v1"
-              className="input-gemini"
-            />
+              <div>
+                <label className="mb-1.5 block text-sm font-bold text-secondary">API Key</label>
+                {editingProviderId && editingMaskedKey && (
+                  <p
+                    className="mb-2 select-none font-mono text-xs text-tertiary"
+                    onCopy={preventSecretCopy}
+                    onCut={preventSecretCopy}
+                    onContextMenu={preventSecretCopy}
+                  >
+                    API key tersimpan: {editingMaskedKey}
+                  </p>
+                )}
+                <input
+                  type="password"
+                  value={form.api_key}
+                  onChange={(e) => setForm({ ...form, api_key: e.target.value })}
+                  placeholder={editingProviderId ? 'Kosongkan jika hanya ingin mengubah model/base URL' : 'Masukkan API key'}
+                  required={!editingProviderId}
+                  className="input-gemini"
+                />
+              </div>
+
+              <div className="flex flex-col-reverse sm:flex-row gap-3 mt-8 pt-4 border-t-2 border-border">
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="flex-1 !rounded-none border-2 border-border py-2.5 sm:py-3 text-sm font-bold uppercase text-secondary transition-all duration-200 hover:bg-tertiary shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => testConnection()}
+                  disabled={!form.api_key || !form.model_name || testing || saving}
+                  className="flex items-center justify-center gap-2 flex-1 !rounded-none border-2 border-border bg-gemini-orange py-2.5 sm:py-3 text-sm font-black uppercase text-[#111] transition-all duration-200 hover:bg-gemini-orange/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[3px_3px_0_var(--border)]"
+                >
+                  {testing ? (
+                    <><Wand2 size={16} className="animate-wand-swing" /> Testing...</>
+                  ) : (
+                    'Test'
+                  )}
+                </button>
+                <button
+                  type="submit"
+                  disabled={!form.model_name || (!editingProviderId && !form.api_key) || saving || testing}
+                  className="flex items-center justify-center gap-2 flex-1 !rounded-none border-2 border-border bg-gemini-blue py-2.5 sm:py-3 text-sm font-black uppercase text-white transition-all duration-200 hover:bg-gemini-blue/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[3px_3px_0_var(--border)]"
+                >
+                  {saving ? (
+                    <><Wand2 size={16} className="animate-wand-swing" /> Menyimpan...</>
+                  ) : (
+                    'Simpan'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
-        )}
-
-        <div>
-          <label className="mb-1.5 block text-sm text-secondary">API Key</label>
-          {editingProviderId && editingMaskedKey && (
-            <p
-              className="mb-2 select-none font-mono text-xs text-tertiary"
-              onCopy={preventSecretCopy}
-              onCut={preventSecretCopy}
-              onContextMenu={preventSecretCopy}
-            >
-              API key tersimpan: {editingMaskedKey}
-            </p>
-          )}
-          <input
-            type="password"
-            value={form.api_key}
-            onChange={(e) => setForm({ ...form, api_key: e.target.value })}
-            placeholder={editingProviderId ? 'Kosongkan jika hanya ingin mengubah model/base URL' : 'Masukkan API key'}
-            required={!editingProviderId}
-            className="input-gemini"
-          />
         </div>
-
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            disabled={!form.model_name || (!editingProviderId && !form.api_key) || saving || testing}
-            className="btn-gradient flex-1 py-2.5 sm:py-3 text-sm font-semibold"
-          >
-            {saving ? 'Saving...' : editingProviderId ? 'Save Changes & Test' : 'Save & Test Connection'}
-          </button>
-          <button
-            type="button"
-            onClick={() => testConnection()}
-            disabled={!form.api_key || !form.model_name || testing || saving}
-            className="rounded-xl border border-subtle px-4 py-2.5 sm:px-6 sm:py-3 text-sm font-medium text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-30"
-          >
-            {testing ? (
-              <span className="flex items-center gap-2">
-                <span className="size-4 rounded-full border-2 border-subtle border-t-gemini-blue animate-spin" />
-                Testing...
-              </span>
-            ) : (
-              'Test'
-            )}
-          </button>
-        </div>
-      </form>
+      )}
 
       {deleteTargetId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
-          <div className="animate-fade-in-up mx-4 w-full max-w-sm glass rounded-2xl p-4 sm:p-6 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-red-500/10 ring-1 ring-red-500/20">
-              <svg className="size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="animate-fade-in-up mx-4 w-full max-w-sm brutal-card !rounded-none p-6 sm:p-8 text-center !shadow-[6px_6px_0_var(--border)]">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center !rounded-none bg-gemini-red border-2 border-border">
+              <svg className="size-7 text-[#111]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
               </svg>
             </div>
-            <h3 className="mb-2 text-lg font-semibold text-primary">Hapus Provider</h3>
+            <h3 className="mb-2 text-xl font-black uppercase tracking-widest text-primary text-center">Hapus Provider</h3>
+            <div className="mx-auto mb-6 mt-2 h-[2px] w-16 bg-border" />
             <p className="mb-6 text-sm text-secondary">Anda yakin ingin menghapus provider ini?</p>
             <div className="flex gap-3">
               <button
                 onClick={cancelDelete}
-                className="flex-1 rounded-xl border border-subtle py-2.5 text-sm font-medium text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                className="flex-1 !rounded-none border-2 border-border py-2.5 text-sm font-bold uppercase text-secondary transition-all duration-200 hover:bg-tertiary shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
               >
                 Tidak
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 rounded-xl bg-red-500 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-red-400"
+                className="flex-1 !rounded-none border-2 border-border bg-gemini-red py-2.5 text-sm font-black uppercase text-white transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
               >
                 Ya, Hapus
               </button>

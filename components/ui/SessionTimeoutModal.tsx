@@ -22,13 +22,13 @@ export function SessionTimeoutModal({ timeRemaining, onStayLoggedIn }: SessionTi
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm transition-opacity duration-300 ${
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-overlay transition-opacity duration-300 ${
         visible ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      <div className="mx-4 w-full max-w-md animate-fade-in-up rounded-2xl border border-subtle bg-secondary p-6 shadow-2xl">
+      <div className="mx-4 w-full max-w-md animate-fade-in-up rounded-md border border-subtle bg-secondary p-6 shadow-[var(--shadow)]">
         <div className="mb-4 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/10 ring-1 ring-amber-500/20">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-amber-500/10 border-2 border-amber-500/20">
             <Clock className="size-5 text-amber-400" />
           </div>
           <div>
@@ -43,7 +43,7 @@ export function SessionTimeoutModal({ timeRemaining, onStayLoggedIn }: SessionTi
         </p>
 
         <div className="mb-5 flex items-center justify-center">
-          <div className="flex items-baseline gap-1 rounded-xl bg-tertiary px-4 py-3 ring-1 ring-[var(--border)]">
+          <div className="flex items-baseline gap-1 rounded-xl bg-tertiary px-4 py-3 border-2 border-subtle">
             <span className="text-2xl font-bold text-primary tabular-nums">
               {String(minutes).padStart(2, '0')}
             </span>
