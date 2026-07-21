@@ -8,6 +8,7 @@ interface ChatState {
   sessionId: string | null;
   sessionTitle: string;
   isGenerating: boolean;
+  isGeneratingDocs: boolean;
   streamingContent: string;
   chatError: string | null;
   sidebarVersion: number;
@@ -19,6 +20,7 @@ interface ChatState {
   setMessages: (messages: Message[]) => void;
   addMessage: (message: Message) => void;
   setIsGenerating: (value: boolean) => void;
+  setIsGeneratingDocs: (value: boolean) => void;
   setStreamingContent: (content: string) => void;
   appendStreamingContent: (token: string) => void;
   setChatError: (error: string | null) => void;
@@ -33,6 +35,7 @@ export const useChatStore = create<ChatState>((set) => ({
   sessionId: null,
   sessionTitle: '',
   isGenerating: false,
+  isGeneratingDocs: false,
   streamingContent: '',
   chatError: null,
   sidebarVersion: 0,
@@ -45,6 +48,7 @@ export const useChatStore = create<ChatState>((set) => ({
   addMessage: (message) =>
     set((state) => ({ messages: [...state.messages, message] })),
   setIsGenerating: (value) => set({ isGenerating: value }),
+  setIsGeneratingDocs: (value) => set({ isGeneratingDocs: value }),
   setStreamingContent: (content) => set({ streamingContent: content }),
   appendStreamingContent: (token) =>
     set((state) => ({ streamingContent: state.streamingContent + token })),
@@ -58,6 +62,7 @@ export const useChatStore = create<ChatState>((set) => ({
       sessionId: null,
       sessionTitle: '',
       isGenerating: false,
+      isGeneratingDocs: false,
       streamingContent: '',
       chatError: null,
       sidebarVersion: 0,

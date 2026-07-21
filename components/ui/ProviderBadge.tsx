@@ -61,7 +61,7 @@ export function ProviderBadge() {
   if (!label) return null;
 
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-xl bg-tertiary border border-subtle px-2.5 py-1.5">
+    <div className="inline-flex items-center gap-1.5 rounded-xl bg-tertiary border border-subtle px-2 py-1">
       <span className="size-1.5 rounded-full bg-gemini-teal " />
       <span className="text-[10px] text-tertiary truncate max-w-[140px]">{label}</span>
     </div>

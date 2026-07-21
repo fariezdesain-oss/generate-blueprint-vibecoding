@@ -17,7 +17,7 @@ function getTimeout(): number {
 const TIMEOUT_MS = getTimeout();
 const WARNING_MS = Math.min(DEFAULT_WARNING_MS, TIMEOUT_MS - 1000);
 
-export function useInactivityTimeout(onTimeout: () => void) {
+export function useInactivityTimeout(onTimeout: () => void, isBusy: boolean = false) {
   const [showWarning, setShowWarning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(WARNING_MS);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,8 +75,6 @@ export function useInactivityTimeout(onTimeout: () => void) {
   }, [startTimers]);
 
   useEffect(() => {
-    startTimers();
-
     const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
     let throttleId: ReturnType<typeof setTimeout> | null = null;
 
@@ -91,12 +89,19 @@ export function useInactivityTimeout(onTimeout: () => void) {
 
     events.forEach((event) => window.addEventListener(event, handleActivity));
 
+    if (isBusy) {
+      clearAllTimers();
+      setShowWarning(false);
+    } else {
+      startTimers();
+    }
+
     return () => {
       clearAllTimers();
       events.forEach((event) => window.removeEventListener(event, handleActivity));
       if (throttleId) clearTimeout(throttleId);
     };
-  }, [startTimers, resetTimer, clearAllTimers]);
+  }, [isBusy, startTimers, resetTimer, clearAllTimers]);
 
   return { showWarning, timeRemaining, resetTimer };
 }

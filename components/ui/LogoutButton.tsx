@@ -27,7 +27,7 @@ export function LogoutButton() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="brutal-button flex w-full items-center justify-center gap-2.5 rounded-md px-3 py-2 text-sm !border-gemini-red !text-gemini-red !bg-transparent hover:!bg-gemini-red hover:!text-white dark:hover:!text-black !shadow-[3px_3px_0_var(--gemini-red)] hover:!shadow-[3px_3px_0_#111] dark:hover:!shadow-[3px_3px_0_#fff] active:!shadow-[1px_1px_0_#111] dark:active:!shadow-[1px_1px_0_#fff] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="brutal-button flex w-full items-center justify-center gap-2.5 rounded-md px-2 py-1 text-xs !border-gemini-red !text-gemini-red !bg-transparent hover:!bg-gemini-red hover:!text-white dark:hover:!text-black !shadow-[3px_3px_0_var(--gemini-red)] hover:!shadow-[3px_3px_0_#111] dark:hover:!shadow-[3px_3px_0_#fff] active:!shadow-[1px_1px_0_#111] dark:active:!shadow-[1px_1px_0_#fff] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       {loading ? (
         <Wand2 size={16} className="animate-wand-swing" />

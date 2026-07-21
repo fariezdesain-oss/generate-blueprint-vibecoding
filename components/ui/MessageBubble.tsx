@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { createClient } from '@/lib/db/supabaseBrowserClient';
 import { FileIcon, ImageIcon } from 'lucide-react';
 import type { Message, Attachment } from '@/types/chat';
@@ -29,19 +30,20 @@ function AttachmentPreview({ att }: { att: Attachment }) {
 
   if (isImage && url) {
     return (
-      <div className="mb-2 overflow-hidden rounded-xl border border-subtle">
-        <img
+      <div className="mb-2 relative h-48 w-full overflow-hidden !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)]">
+        <Image
           src={url}
           alt={att.name}
-          className="max-h-48 w-full object-contain"
-          loading="lazy"
+          fill
+          className="object-contain"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
     );
   }
 
   return (
-      <div className="mb-2 flex items-center gap-2 rounded-lg border border-subtle bg-tertiary px-3 py-2">
+      <div className="mb-2 flex items-center gap-2 !rounded-none border-2 border-border bg-secondary shadow-[2px_2px_0_var(--border)] px-3 py-2">
       {isImage ? (
         <ImageIcon size={16} className="text-gemini-blue/70" />
       ) : (
@@ -73,10 +75,10 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`}>
       <div
-        className={`max-w-[80%] rounded-md px-4 py-3 ${
+        className={`max-w-[80%] !rounded-none px-4 py-3 ${
           isUser
-            ? 'rounded-br-sm bg-gemini-blue text-white '
-            : 'rounded-bl-sm px-4 py-3 brutal-panel text-primary'
+            ? '!rounded-none bg-gemini-blue text-white '
+            : '!rounded-none px-4 py-3 bg-tertiary border-2 border-border shadow-[4px_4px_0_var(--border)] text-primary'
         }`}
       >
         <Attachments attachments={message.attachments || []} />
@@ -89,7 +91,7 @@ export const MessageBubble = memo(function MessageBubble({ message }: MessageBub
             </div>
           )
         )}
-        <p className={`mt-1 text-right text-[10px] ${isUser ? 'text-secondary' : 'text-tertiary'}`}>
+        <p className={`mt-1.5 text-right text-[10px] font-bold ${isUser ? 'text-white/90' : 'text-primary opacity-60'}`}>
           {new Date(message.createdAt).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',

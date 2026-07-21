@@ -75,7 +75,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
 
   if (error) {
     return (
-      <div className="my-4 rounded-xl border border-red-500/20 bg-red-500/5 p-4">
+      <div className="my-4 !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] bg-red-500/5 p-4">
         <p className="mb-2 text-xs font-bold text-red-400">Diagram tidak bisa dirender</p>
         <pre className="overflow-x-auto font-mono text-xs text-tertiary">{code}</pre>
       </div>
@@ -85,14 +85,14 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
   return (
     <div className="my-4 overflow-x-auto">
       {!rendered && (
-        <div className="flex items-center gap-2 rounded-xl border border-subtle bg-tertiary p-4">
+        <div className="flex items-center gap-2 !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] bg-tertiary p-4">
           <Wand2 className="size-3 animate-wand-swing text-gemini-blue" />
           <span className="text-xs text-tertiary">Merender diagram...</span>
         </div>
       )}
       <div
         ref={ref}
-        className="flex justify-center rounded-xl border border-subtle bg-[rgba(255,255,255,0.02)] p-4"
+        className="flex justify-center !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] bg-[rgba(255,255,255,0.02)] p-4"
         style={{ display: rendered ? 'flex' : 'none' }}
       />
     </div>

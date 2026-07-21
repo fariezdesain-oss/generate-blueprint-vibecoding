@@ -57,18 +57,18 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
       <>
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 bg-tertiary border border-subtle border-r-0 rounded-l-xl p-2.5 text-tertiary hover:text-primary transition-all shadow-[var(--shadow)]  hidden md:block z-40"
+          className="absolute right-0 top-1/2 -translate-y-1/2 bg-gemini-orange border-2 border-r-0 border-border !rounded-none p-2.5 text-[#111] hover:bg-gemini-blue hover:text-white transition-colors shadow-[-4px_4px_0_var(--border)] hidden md:block z-40 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[-2px_2px_0_var(--border)]"
           title="Buka Project State"
         >
-          <FileJson size={20} />
+          <FileJson size={20} className="stroke-[2.5px]" />
         </button>
         
         <button
           onClick={() => setIsOpen(true)}
-          className="absolute right-4 bottom-24 bg-gemini-blue text-white rounded-full p-3 shadow-[var(--shadow)]  md:hidden z-40 animate-fade-in-up"
+          className="absolute right-4 bottom-24 bg-gemini-orange text-[#111] border-2 border-border !rounded-none p-3 shadow-[4px_4px_0_var(--border)] md:hidden z-40 animate-fade-in-up active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_var(--border)]"
           title="Buka Project State"
         >
-          <FileJson size={20} />
+          <FileJson size={20} className="stroke-[2.5px]" />
         </button>
       </>
     );
@@ -76,9 +76,9 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
 
   const renderValue = (value: unknown) => {
     if (Array.isArray(value)) {
-      if (value.length === 0) return <span className="text-tertiary italic">- Kosong -</span>;
+      if (value.length === 0) return <span className="text-tertiary font-bold italic">- Kosong -</span>;
       return (
-        <ul className="list-disc pl-4 space-y-1">
+        <ul className="list-disc pl-4 space-y-1 font-medium">
           {value.map((item, i) => (
             <li key={i}>{String(item)}</li>
           ))}
@@ -87,50 +87,50 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
     }
     if (typeof value === 'object' && value !== null) {
       return (
-        <pre className="font-mono text-[10px] sm:text-xs overflow-x-auto text-secondary">
+        <pre className="font-mono text-[10px] sm:text-xs overflow-x-auto text-secondary font-semibold">
           {JSON.stringify(value, null, 2)}
         </pre>
       );
     }
-    return <span>{String(value || '-')}</span>;
+    return <span className="font-medium">{String(value || '-')}</span>;
   };
 
   const panelContent = (
     <>
-      <div className="flex items-center justify-between p-4 border-b border-subtle shrink-0">
-        <h2 className="font-bold text-primary flex items-center gap-2 text-sm">
-          <FileJson size={18} className="text-secondary" />
+      <div className="flex items-center justify-between p-4 border-b-2 border-border shrink-0 bg-gemini-orange">
+        <h2 className="font-black uppercase tracking-widest text-[#111] flex items-center gap-2 text-sm">
+          <FileJson size={18} className="text-[#111] stroke-[2.5px]" />
           Project State
-          {isRefreshing && <Wand2 className="size-3 animate-wand-swing text-gemini-blue ml-2" />}
+          {isRefreshing && <Wand2 className="size-3 animate-wand-swing text-[#111] ml-2 stroke-[2.5px]" />}
         </h2>
         <button
           onClick={() => setIsOpen(false)}
-          className="p-1.5 rounded-lg hover:bg-tertiary text-tertiary hover:text-primary transition-colors"
+          className="p-1 !rounded-none border-2 border-transparent hover:border-[#111] text-[#111] transition-all active:translate-x-[1px] active:translate-y-[1px]"
         >
-          <span className="hidden md:block"><ChevronRight size={18} /></span>
-          <span className="block md:hidden"><X size={18} /></span>
+          <span className="hidden md:block"><ChevronRight size={18} className="stroke-[2.5px]" /></span>
+          <span className="block md:hidden"><X size={18} className="stroke-[2.5px]" /></span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 text-xs sm:text-sm">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 text-xs sm:text-sm bg-secondary">
         {!hasData && !rollingSummary ? (
-          <p className="text-tertiary text-center mt-10">
+          <p className="text-tertiary text-center mt-10 font-bold">
             State belum terbentuk. Lanjutkan chat untuk mengisi state.
           </p>
         ) : (
           <>
             {hasData && (
               <div className="space-y-4">
-                <h3 className="font-semibold text-[10px] sm:text-xs tracking-wider text-tertiary uppercase flex items-center gap-2">
-                  <span>State Terstruktur</span>
-                  <div className="h-px flex-1 bg-subtle" />
+                <h3 className="font-black text-[10px] sm:text-xs tracking-widest text-primary uppercase flex items-center gap-2">
+                  <span className="bg-gemini-blue text-white px-2 py-0.5 border-2 border-border shadow-[2px_2px_0_var(--border)]">State Terstruktur</span>
+                  <div className="h-0.5 flex-1 bg-border ml-2" />
                 </h3>
                 {Object.entries(projectState!).map(([key, value]) => (
                   <div key={key} className="space-y-1.5">
-                    <p className="font-bold text-gemini-blue capitalize">
+                    <p className="font-black text-gemini-blue uppercase tracking-wide">
                       {key.replace(/_/g, ' ')}
                     </p>
-                    <div className="bg-tertiary/50 rounded-xl p-3 text-primary leading-relaxed border border-subtle/50">
+                    <div className="bg-tertiary !rounded-none p-3 text-primary leading-relaxed border-2 border-border shadow-[3px_3px_0_var(--border)]">
                       {renderValue(value)}
                     </div>
                   </div>
@@ -139,12 +139,12 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
             )}
 
             {rollingSummary && (
-              <div className="space-y-4 pt-2">
-                <h3 className="font-semibold text-[10px] sm:text-xs tracking-wider text-tertiary uppercase flex items-center gap-2">
-                  <span>Ringkasan Berjalan</span>
-                  <div className="h-px flex-1 bg-subtle" />
+              <div className="space-y-4 pt-4 border-t-2 border-border border-dashed">
+                <h3 className="font-black text-[10px] sm:text-xs tracking-widest text-primary uppercase flex items-center gap-2">
+                  <span className="bg-gemini-teal text-[#111] px-2 py-0.5 border-2 border-border shadow-[2px_2px_0_var(--border)]">Ringkasan Berjalan</span>
+                  <div className="h-0.5 flex-1 bg-border ml-2" />
                 </h3>
-                <div className="bg-tertiary/50 rounded-xl p-3 text-primary leading-relaxed whitespace-pre-wrap border border-subtle/50">
+                <div className="bg-tertiary !rounded-none p-3 text-primary leading-relaxed whitespace-pre-wrap border-2 border-border shadow-[3px_3px_0_var(--border)] font-medium">
                   {rollingSummary}
                 </div>
               </div>
@@ -159,18 +159,18 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
     <>
       {/* Mobile Backdrop */}
       <div 
-        className="fixed inset-0 bg-overlay/50 z-40 md:hidden animate-fade-in"
+        className="fixed inset-0 bg-overlay z-40 md:hidden animate-fade-in"
         onClick={() => setIsOpen(false)}
       />
       
       {/* Desktop Sidebar & Mobile Bottom Sheet */}
       <div className={`
-        fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-secondary rounded-t-3xl border-t border-subtle shadow-[var(--shadow)] transition-transform duration-300 transform translate-y-0
-        md:relative md:inset-auto md:h-full md:w-80 md:rounded-none md:border-t-0 md:border-l md:shadow-none md:translate-y-0 md:flex md:z-auto
+        fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-secondary !rounded-none border-t-2 border-border shadow-[0_-4px_0_var(--border)] transition-transform duration-300 transform translate-y-0
+        md:relative md:inset-auto md:h-full md:w-80 md:rounded-none md:border-t-0 md:border-l-2 md:shadow-[-4px_0_0_var(--border)] md:translate-y-0 md:flex md:z-auto
       `}>
         {/* Mobile Pull Indicator */}
-        <div className="w-full flex justify-center py-2 md:hidden cursor-pointer" onClick={() => setIsOpen(false)}>
-          <div className="w-12 h-1.5 bg-tertiary rounded-full" />
+        <div className="w-full flex justify-center py-2 md:hidden cursor-pointer bg-gemini-orange border-b-2 border-border shrink-0" onClick={() => setIsOpen(false)}>
+          <div className="w-12 h-1.5 bg-[#111] !rounded-none" />
         </div>
         {panelContent}
       </div>

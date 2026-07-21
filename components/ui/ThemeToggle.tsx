@@ -19,9 +19,9 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       aria-label={label}
       title={label}
       onClick={() => mounted && setTheme(isDark ? 'light' : 'dark')}
-      className={`brutal-button !bg-gemini-orange flex items-center justify-center gap-2.5 px-3 text-sm ${compact ? 'size-11 p-0' : 'w-full'}`}
+      className={`brutal-button !bg-gemini-orange flex items-center justify-center gap-2.5 px-2 text-xs ${compact ? 'size-9 p-0' : 'w-full'}`}
     >
-      {isDark ? <Sun size={18} /> : <Moon size={18} />}
+      {isDark ? <Sun size={16} /> : <Moon size={16} />}
       {!compact && <span>{isDark ? 'Mode Terang' : 'Mode Gelap'}</span>}
     </button>
   );

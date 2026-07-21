@@ -38,7 +38,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center gap-3 sm:gap-4">
-          <div className="size-10 sm:size-12 lg:size-16 rounded-md bg-tertiary flex items-center justify-center">
+          <div className="size-10 sm:size-12 lg:size-16 !rounded-none border-2 border-border bg-tertiary shadow-[2px_2px_0_var(--border)] flex items-center justify-center">
             <Wand2 className="size-4 animate-wand-swing text-gemini-blue" />
           </div>
           <div className="text-center">
@@ -54,7 +54,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
     return (
       <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col items-center gap-3 sm:gap-4 ">
-          <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center rounded-md bg-gemini-blue border-2 border-subtle">
+          <div className="flex size-10 sm:size-12 lg:size-16 items-center justify-center !rounded-none border-2 border-border bg-gemini-blue shadow-[2px_2px_0_var(--border)]">
             <Wand2 className="size-6 sm:size-8 text-white" />
           </div>
           <div className="text-center">
@@ -75,7 +75,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
 
         {isGenerating && streamingContent && (
           <div className="flex justify-start animate-fade-in">
-            <div className="max-w-[80%] rounded-md rounded-bl-sm px-4 py-3 brutal-panel">
+            <div className="max-w-[80%] !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)] px-4 py-3 brutal-panel">
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-primary">
                 {streamingContent}
                 <span className="inline-block size-1.5 animate-pulse rounded-full bg-gemini-blue ml-0.5 " />
@@ -86,7 +86,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
 
         {isGenerating && !streamingContent && (
           <div className="flex justify-start">
-            <div className="rounded-md rounded-bl-sm px-4 py-4 brutal-panel">
+            <div className="!rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)] px-4 py-4 brutal-panel">
               <div className="flex gap-1.5">
                 <span className="typing-dot" />
                 <span className="typing-dot" />

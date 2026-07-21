@@ -105,7 +105,7 @@ export default function HistoryPage() {
 
       {sessions.length === 0 && (
         <div className="flex flex-col items-center gap-3 sm:gap-4 py-8 sm:py-12">
-          <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
+          <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)]">
             <Wand2 className="size-8 text-tertiary" />
           </div>
           <p className="text-sm text-tertiary">Belum ada sesi</p>
@@ -121,7 +121,7 @@ export default function HistoryPage() {
             className="card-gemini group flex cursor-pointer items-center justify-between"
           >
             <div className="flex items-center gap-5">
-              <div className="flex size-10 sm:size-12 items-center justify-center rounded-xl bg-tertiary border-2 border-subtle">
+              <div className="flex size-10 sm:size-12 items-center justify-center !rounded-none border-2 border-border bg-secondary shadow-[4px_4px_0_var(--border)] transition-all hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_var(--border)]">
                 <MessageSquare size={18} className="text-tertiary" />
               </div>
               <div>
@@ -130,12 +130,12 @@ export default function HistoryPage() {
                       {s.title}
                     </p>
                     {s.has_generated && (
-                      <span className="rounded-full bg-gemini-blue px-2.5 py-0.5 text-[10px] font-bold text-white">
+                      <span className="!rounded-none border-2 border-border shadow-[1px_1px_0_var(--border)] bg-gemini-blue text-white uppercase px-2.5 py-0.5 text-[10px] font-bold text-white">
                         DOCS
                       </span>
                     )}
                     {s.has_n8n && (
-                      <span className="rounded-full bg-gemini-blue px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
+                      <span className="!rounded-none border-2 border-border shadow-[1px_1px_0_var(--border)] bg-gemini-blue text-white uppercase px-2.5 py-0.5 text-[10px] font-bold text-emerald-400">
                         N8N
                       </span>
                     )}
@@ -152,7 +152,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}&mode=n8n`);
                     }}
-                    className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
+                    className="!rounded-none border-2 border-transparent p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-emerald-400"
                     title="View n8n Workflow"
                   >
                     <svg className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -166,7 +166,7 @@ export default function HistoryPage() {
                       e.stopPropagation();
                       router.push(`/generate/results?session_id=${s.id}`);
                     }}
-                    className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
+                    className="!rounded-none border-2 border-transparent p-2 text-tertiary transition-all duration-200 hover:bg-tertiary hover:text-gemini-teal"
                     title="View Docs"
                   >
                     <FileText size={16} />
@@ -174,7 +174,7 @@ export default function HistoryPage() {
                 )}
               <button
                 onClick={(e) => handleDeleteClick(s, e)}
-                className="rounded-xl p-2 md:p-2.5 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
+                className="!rounded-none border-2 border-transparent p-2 text-tertiary transition-all duration-200 hover:bg-red-500/10 hover:text-red-400"
                 title="Delete session"
               >
                 <Trash2 size={16} />
@@ -201,7 +201,7 @@ export default function HistoryPage() {
               {deleteTarget.title.length > 40 ? deleteTarget.title.slice(0, 40) + '...' : deleteTarget.title}
             </div>
             {deleteError && (
-              <p className="mb-4 rounded-xl bg-red-500/10 px-3 py-2 text-sm text-red-400">
+              <p className="mb-4 !rounded-none border-2 border-border bg-gemini-red text-white font-black uppercase shadow-[2px_2px_0_var(--border)] px-3 py-2 text-sm text-red-400">
                 {deleteError}
               </p>
             )}

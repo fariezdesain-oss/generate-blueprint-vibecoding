@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/db/supabaseServerClient';
+import { createAdminClient } from '@/lib/db/supabaseAdminClient';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
 type RouteContext = { params: Record<string, string> };
@@ -19,6 +20,29 @@ export function withAuth(handler: AuthenticatedApiHandler) {
     if (!user) {
       return NextResponse.json(
         { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'Unauthorized' } },
+        { status: 401 }
+      );
+    }
+
+    const adminClient = createAdminClient();
+    const { data: profile } = await adminClient
+      .from('profiles')
+      .select('last_activity_at')
+      .eq('id', user.id)
+      .single();
+
+    const THIRTY_MIN_MS = 30 * 60 * 1000;
+    const lastActivity = profile?.last_activity_at
+      ? new Date(profile.last_activity_at).getTime()
+      : Date.now(); // Jika null, anggap baru aktif (mencegah user baru ter-kick)
+
+    // Ignore inactivity check on the heartbeat endpoint itself to avoid infinite loops or deadlocks on session resume.
+    const isActivityRoute = req.url.includes('/api/auth/activity');
+
+    if (!isActivityRoute && Date.now() - lastActivity > THIRTY_MIN_MS) {
+      await adminClient.auth.admin.signOut(user.id);
+      return NextResponse.json(
+        { success: false, error: { code: 'AUTH_SESSION_EXPIRED', message: 'Sesi telah berakhir karena tidak ada aktivitas selama 30 menit.' } },
         { status: 401 }
       );
     }

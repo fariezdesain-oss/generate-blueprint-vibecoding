@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
+import { useActivityHeartbeat } from '@/hooks/useActivityHeartbeat';
 import { SessionTimeoutModal } from './SessionTimeoutModal';
 import { clearActiveChatSession } from '@/lib/utils/browserSession';
 import { useChatStore } from '@/store/useChatStore';
@@ -33,7 +34,12 @@ export function SessionManager({ children }: { children: React.ReactNode }) {
     router.refresh();
   }, [router]);
 
-  const { showWarning, timeRemaining, resetTimer } = useInactivityTimeout(handleTimeout);
+  const isGeneratingChat = useChatStore((s) => s.isGenerating);
+  const isGeneratingDocs = useChatStore((s) => s.isGeneratingDocs);
+  const isBusy = isGeneratingChat || isGeneratingDocs;
+
+  const { showWarning, timeRemaining, resetTimer } = useInactivityTimeout(handleTimeout, isBusy);
+  useActivityHeartbeat(!isBusy);
 
   useEffect(() => {
     return () => {

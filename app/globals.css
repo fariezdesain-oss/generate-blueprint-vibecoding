@@ -80,7 +80,7 @@ button, a, input, select, textarea { touch-action: manipulation; }
   }
   .brutal-panel { background: var(--bg-tertiary); }
   .brutal-button {
-    min-height: 44px;
+    min-height: 36px;
     border: 2px solid var(--border);
     background: var(--gemini-green);
     color: #111111;

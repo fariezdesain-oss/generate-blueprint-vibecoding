@@ -10,7 +10,7 @@ const N8nVisualizer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[400px] items-center justify-center rounded-xl bg-tertiary">
+      <div className="flex h-[400px] items-center justify-center !rounded-none border-2 border-border bg-tertiary shadow-[6px_6px_0_var(--border)]">
         <Wand2 className="size-6 animate-wand-swing text-tertiary" />
       </div>
     ),
@@ -24,7 +24,7 @@ const MarkdownRenderer = dynamic(
     loading: () => (
       <div className="space-y-3 p-4">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-4 rounded-lg bg-tertiary animate-pulse" style={{ width: `${70 + (i % 3) * 10}%` }} />
+          <div key={i} className="h-4 !rounded-none bg-border animate-pulse" style={{ width: `${70 + (i % 3) * 10}%` }} />
         ))}
       </div>
     ),
@@ -43,6 +43,8 @@ interface N8nData {
   setup_instructions?: string;
 }
 
+import { useChatStore } from '@/store/useChatStore';
+
 function GenerateResultsContent() {
   const [data, setData] = useState<GenerateData | null>(null);
   const [n8nData, setN8nData] = useState<N8nData | null>(null);
@@ -50,6 +52,13 @@ function GenerateResultsContent() {
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState<string | null>(null);
+  const [genProgress, setGenProgress] = useState<{
+    fileName: string;
+    fileProgress: number;
+    overallProgress: number;
+    stageMessage: string;
+    showModal: boolean;
+  } | null>(null);
   const [n8nTab, setN8nTab] = useState<'json' | 'setup'>('json');
   const [error, setError] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -57,6 +66,13 @@ function GenerateResultsContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const isN8n = searchParams.get('mode') === 'n8n';
+
+  const setIsGeneratingDocs = useChatStore((s) => s.setIsGeneratingDocs);
+
+  useEffect(() => {
+    setIsGeneratingDocs(!!regenerating);
+    return () => setIsGeneratingDocs(false);
+  }, [regenerating, setIsGeneratingDocs]);
 
   const loadFiles = useCallback(async () => {
     if (!sessionId) {
@@ -172,12 +188,37 @@ function GenerateResultsContent() {
   };
 
   const handleRegenerate = async (fileName: string) => {
+    const files = data?.files || {};
+    const currentGeneratedCount = FILE_ORDER.filter((name) => name in files).length;
     if (!sessionId || regenerating) return;
     const fileIndex = FILE_ORDER.indexOf(fileName);
     if (fileIndex === -1) return;
 
+    // Freeze overall progress exactly at what it was before regenerating
+    const frozenOverallProgress = Math.round((currentGeneratedCount / FILE_ORDER.length) * 100);
+
     setRegenerating(fileName);
     setError(null);
+    setGenProgress({
+      fileName,
+      fileProgress: 25,
+      overallProgress: frozenOverallProgress,
+      stageMessage: `Mempersiapkan regenerasi ${FILE_LABELS[fileName] || fileName}...`,
+      showModal: true,
+    });
+
+    const progressInterval = setInterval(() => {
+      setGenProgress((prev) => {
+        if (!prev || prev.fileProgress >= 95) return prev;
+        const increment = prev.fileProgress < 60 ? 5 : 2;
+        const newFileProgress = Math.min(prev.fileProgress + increment, 95);
+        return {
+          ...prev,
+          fileProgress: newFileProgress,
+          overallProgress: frozenOverallProgress // Tetap membekukan nilai untuk keseluruhan
+        };
+      });
+    }, 800);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 120000);
@@ -189,17 +230,32 @@ function GenerateResultsContent() {
         body: JSON.stringify({ session_id: sessionId, file_index: fileIndex }),
         signal: controller.signal,
       });
+      
       clearTimeout(timer);
+      clearInterval(progressInterval);
 
       const json = await res.json();
       if (json.success) {
         sessionStorage.removeItem(`generateResult_${sessionId}`);
+        setGenProgress({
+          fileName,
+          fileProgress: 100,
+          overallProgress: frozenOverallProgress,
+          stageMessage: `${FILE_LABELS[fileName] || fileName} selesai di-regenerate.`,
+          showModal: true,
+        });
         await loadFiles();
+        setTimeout(() => {
+          setGenProgress(null);
+        }, 1000);
       } else {
         setError(json.error?.message || 'Gagal regenerate dokumen');
+        setGenProgress(null);
       }
     } catch (err) {
       clearTimeout(timer);
+      clearInterval(progressInterval);
+      setGenProgress(null);
       if (err instanceof DOMException && err.name === 'AbortError') {
         setError('Regenerate memakan waktu terlalu lama. Coba lagi atau gunakan provider yang lebih cepat.');
       } else {
@@ -236,7 +292,7 @@ function GenerateResultsContent() {
     if (!n8nData) {
       return (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
-          <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
+          <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)]">
             <Workflow className="size-6 sm:size-8 text-tertiary" />
           </div>
           <p className="text-sm sm:text-lg text-tertiary">Belum ada n8n workflow untuk sesi ini</p>
@@ -263,7 +319,7 @@ function GenerateResultsContent() {
           <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
             <button
               onClick={() => router.push('/chat')}
-              className="rounded-xl border border-subtle px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+              className="!rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
             >
               Back to Chat
             </button>
@@ -271,7 +327,7 @@ function GenerateResultsContent() {
               <>
                 <button
                   onClick={() => handleCopy(jsonStr, 'n8n')}
-                  className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-subtle px-3 sm:px-4 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                  className="flex items-center gap-1.5 sm:gap-2 !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] px-3 sm:px-4 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                 >
                   <Copy className="size-3 sm:size-4" />
                   <span className="hidden sm:inline">{copied === 'n8n' ? 'Copied!' : 'Copy'}</span>
@@ -321,8 +377,8 @@ function GenerateResultsContent() {
             <N8nVisualizer workflowJson={jsonStr} />
           ) : (
             <div className="mx-auto max-w-3xl overflow-y-auto h-full p-4 sm:p-8">
-              <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3 rounded-md border border-emerald-500/20 bg-emerald-500/5 px-4 sm:px-5 py-3 sm:py-4">
-                <div className="flex size-8 sm:size-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
+              <div className="mb-4 sm:mb-6 flex items-center gap-2 sm:gap-3 !rounded-none border-2 border-border bg-secondary shadow-[4px_4px_0_var(--border)] px-4 sm:px-5 py-3 sm:py-4">
+                <div className="flex size-8 sm:size-10 shrink-0 items-center justify-center !rounded-none border-2 border-border bg-gemini-blue shadow-[2px_2px_0_var(--border)] text-[#111]">
                   <svg className="size-4 sm:size-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
                   </svg>
@@ -345,7 +401,7 @@ function GenerateResultsContent() {
   if (!data) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
-        <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
+        <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)]">
           <FileText className="size-6 sm:size-8 text-tertiary" />
         </div>
         <p className="text-sm sm:text-lg text-tertiary">Belum ada hasil generate untuk sesi ini</p>
@@ -372,7 +428,7 @@ function GenerateResultsContent() {
         <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
           <button
             onClick={() => router.push(`/chat?id=${sessionId}`)}
-            className="rounded-xl border border-subtle px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+            className="!rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
           >
             Back to Chat
           </button>
@@ -399,7 +455,7 @@ function GenerateResultsContent() {
               key={name}
               onClick={() => hasFile && !isRegenerating && setActiveFile(name)}
               disabled={!hasFile || isRegenerating}
-              className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+              className={`shrink-0 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
                 isActive && hasFile
                   ? 'bg-gemini-blue/10 text-gemini-blue border border-gemini-blue/20'
                   : hasFile
@@ -427,7 +483,7 @@ function GenerateResultsContent() {
                   key={name}
                   onClick={() => hasFile && !isRegenerating && setActiveFile(name)}
                   disabled={!hasFile || isRegenerating}
-                  className={`flex w-full items-center gap-2.5 lg:gap-3 rounded-xl px-2.5 lg:px-3 py-2 lg:py-3 text-left text-xs lg:text-sm transition-all duration-200 ${
+                  className={`flex w-full items-center gap-2.5 lg:gap-3 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 lg:px-3 py-2 lg:py-3 text-left text-xs lg:text-sm transition-all duration-200 ${
                     isActive && hasFile
                       ? 'card-gemini-active text-gemini-blue font-bold'
                       : hasFile
@@ -459,21 +515,21 @@ function GenerateResultsContent() {
                   <button
                     onClick={() => handleRegenerate(activeFile)}
                     disabled={regenerating !== null}
-                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-40"
+                    className="flex items-center gap-1 sm:gap-2 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:opacity-40"
                   >
                     <RefreshCw className={`size-3 sm:size-3.5 ${regenerating === activeFile ? 'animate-spin text-gemini-blue' : ''}`} />
                     <span className="hidden sm:inline">{regenerating === activeFile ? `Regenerating...` : 'Regenerate'}</span>
                   </button>
                   <button
                     onClick={() => handleCopy(files[activeFile], activeFile)}
-                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                    className="flex items-center gap-1 sm:gap-2 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                   >
                     <Copy className="size-3 sm:size-3.5" />
                     {copied === activeFile ? 'Copied!' : 'Copy'}
                   </button>
                   <button
                     onClick={() => handleDownload(files[activeFile], activeFile)}
-                    className="flex items-center gap-1 sm:gap-2 rounded-xl border border-subtle px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+                    className="flex items-center gap-1 sm:gap-2 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
                   >
                     <Download className="size-3 sm:size-3.5" />
                     Download
@@ -488,7 +544,7 @@ function GenerateResultsContent() {
             </>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 sm:gap-4 ">
-              <div className="flex size-12 sm:size-16 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">
+              <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)]">
                 <Wand2 className="size-6 sm:size-8 text-tertiary" />
               </div>
               <p className="text-sm sm:text-lg text-tertiary">File not available</p>
@@ -496,6 +552,68 @@ function GenerateResultsContent() {
           )}
         </div>
       </div>
+
+      {genProgress?.showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm animate-fade-in" data-testid="regenerate-progress-modal">
+          <div className="animate-fade-in-up mx-4 w-full max-w-md brutal-card !rounded-none p-6 sm:p-8 !shadow-[6px_6px_0_var(--border)] bg-secondary">
+            <div className="flex flex-col items-center gap-4 sm:gap-6">
+              <div className="flex size-12 sm:size-16 items-center justify-center !rounded-none border-2 border-border bg-gemini-blue/20">
+                <Wand2 className="size-6 sm:size-8 text-gemini-blue animate-wand-swing stroke-[2.5px]" />
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-sm font-bold text-primary">{genProgress.stageMessage}</p>
+                <p className="text-xs text-secondary">{FILE_LABELS[genProgress.fileName] || genProgress.fileName}</p>
+              </div>
+              <div className="w-full space-y-4">
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black uppercase text-secondary">
+                    <span>Progres Dokumen Saat Ini</span>
+                    <span>{genProgress.fileProgress}%</span>
+                  </div>
+                  <div className="h-4 w-full !rounded-none border-2 border-border bg-secondary shadow-[3px_3px_0_var(--border)] overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 border-r-2 border-border transition-all duration-300 ease-out"
+                      style={{ width: `${genProgress.fileProgress}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between text-xs font-black uppercase text-secondary">
+                    <span>Progres Keseluruhan</span>
+                    <span>{genProgress.overallProgress}%</span>
+                  </div>
+                  <div className="h-3 w-full !rounded-none border-2 border-border bg-secondary shadow-[2px_2px_0_var(--border)] overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-500 border-r-2 border-border transition-all duration-300 ease-out"
+                      style={{ width: `${genProgress.overallProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {FILE_ORDER.map((name) => {
+                  const isCurrent = genProgress.fileName === name;
+                  const isCompleted = name in files && !isCurrent;
+                  
+                  return (
+                    <div
+                      key={name}
+                      className={`size-3 border-2 border-border !rounded-none transition-all duration-300 ${
+                        isCurrent
+                          ? 'bg-emerald-400 animate-pulse'
+                          : isCompleted 
+                            ? 'bg-emerald-500 shadow-[1px_1px_0_var(--border)]' 
+                            : 'bg-secondary'
+                      }`}
+                      title={FILE_LABELS[name] || name}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

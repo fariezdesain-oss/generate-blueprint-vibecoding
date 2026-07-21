@@ -183,12 +183,25 @@ export async function processSequential(
     ? fallbackCandidates
     : [{ id: 'primary', config: aiConfig, isPrimary: true }];
 
+  // Saat regenerate (maxFiles === 1), kita bekukan overallProgress berdasarkan state sebelum regenerate
+  const isSingleRegenerate = maxFiles === 1;
+  const initialGeneratedCount = countGeneratedSpecFiles(existingFiles);
+  const frozenOverallProgress = Math.round((initialGeneratedCount / FILE_ORDER.length) * 100);
+
   const pushProgress = async (i: number, fileName: string, progress: number, stage: GenerationProgress['stage'], message: string) => {
+    let overallProgress = frozenOverallProgress;
+    
+    // Hanya hitung ulang progress jika ini bukan mode regenerasi tunggal
+    if (!isSingleRegenerate) {
+       const currentlyGeneratedCount = countGeneratedSpecFiles(existingFiles);
+       overallProgress = Math.round((currentlyGeneratedCount / FILE_ORDER.length) * 100);
+    }
+
     await updateGenerationProgress(supabase, sessionId, userId, {
       currentFileIndex: i,
       currentFileName: fileName,
       currentFileProgress: progress,
-      overallProgress: Math.round(((i + progress / 100) / FILE_ORDER.length) * 100),
+      overallProgress,
       stage,
       message,
     });

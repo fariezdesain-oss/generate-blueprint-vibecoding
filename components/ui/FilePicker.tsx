@@ -74,22 +74,22 @@ export function FilePicker({ sessionId, onFilesReady, disabled }: FilePickerProp
           key={att.id}
           type="button"
           onClick={() => setPreviewFile(att)}
-          className="group relative flex items-center gap-1.5 rounded-lg border border-subtle bg-tertiary px-2 py-1.5 transition-all duration-200 hover:bg-tertiary hover:border-hover-color"
+          className="group relative flex items-center gap-2 !rounded-none border-2 border-border bg-tertiary px-2 py-1.5 transition-all duration-200 hover:bg-secondary hover:shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
         >
           {isImage(att.mimeType) ? (
-            <ImageIcon size={14} className="text-gemini-blue/70" />
+            <ImageIcon size={14} className="text-gemini-blue stroke-[2.5px]" />
           ) : (
-            <FileIcon size={14} className="text-amber-400/70" />
+            <FileIcon size={14} className="text-gemini-orange stroke-[2.5px]" />
           )}
-          <span className="max-w-[100px] truncate text-xs text-secondary">{att.name}</span>
+          <span className="max-w-[100px] truncate text-xs font-bold text-primary">{att.name}</span>
           <div
             onClick={(e) => {
               e.stopPropagation();
               removeFile(att.id);
             }}
-            className="ml-0.5 rounded-full p-0.5 text-tertiary opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-tertiary hover:text-secondary"
+            className="ml-0.5 !rounded-none border-2 border-transparent p-0.5 text-tertiary opacity-0 transition-all duration-200 group-hover:opacity-100 hover:border-border hover:bg-gemini-red hover:text-white"
           >
-            <X size={12} />
+            <X size={12} className="stroke-[2.5px]" />
           </div>
         </button>
       ))}
@@ -97,18 +97,18 @@ export function FilePicker({ sessionId, onFilesReady, disabled }: FilePickerProp
       {attachments.length < MAX_FILES && (
         <>
           {uploading ? (
-            <div className="flex items-center gap-1.5 rounded-lg border border-subtle bg-secondary px-3 py-1.5">
-              <Wand2 size={14} className="animate-wand-swing text-primary" />
-              <span className="text-xs text-tertiary">Uploading...</span>
+            <div className="flex items-center gap-2 !rounded-none border-2 border-border bg-secondary px-3 py-1.5 shadow-[2px_2px_0_var(--border)]">
+              <Wand2 size={14} className="animate-wand-swing text-primary stroke-[2.5px]" />
+              <span className="text-xs font-bold uppercase tracking-widest text-primary">Uploading...</span>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={disabled}
-              className="flex items-center gap-1.5 rounded-lg border border-dashed border-subtle px-3 py-1.5 text-xs text-tertiary transition-all duration-200 hover:border-hover-color hover:text-secondary disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 !rounded-none border-2 border-dashed border-border px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-secondary transition-all duration-200 hover:border-solid hover:bg-tertiary hover:text-primary hover:shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:translate-x-0 disabled:active:translate-y-0"
             >
-              <Paperclip size={14} />
+              <Paperclip size={14} className="stroke-[2.5px]" />
               Attach
             </button>
           )}

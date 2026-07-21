@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, FileIcon, Download , Wand2} from 'lucide-react';
+import Image from 'next/image';
 import { createClient } from '@/lib/db/supabaseBrowserClient';
 import type { Attachment } from '@/types/chat';
 
@@ -86,11 +87,15 @@ export function FilePreviewModal({ attachment, onClose }: FilePreviewModalProps)
               <p className="text-xs text-tertiary">Loading...</p>
             </div>
           ) : isImage && url ? (
-            <img
-              src={url}
-              alt={attachment.name}
-              className="max-h-[65vh] w-full rounded-lg object-contain"
-            />
+            <div className="relative w-full max-h-[65vh] min-h-[50vh]">
+              <Image
+                src={url}
+                alt={attachment.name}
+                fill
+                className="rounded-lg object-contain"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            </div>
           ) : (
             <div className="flex flex-col items-center gap-4 py-12">
               <div className="flex size-20 items-center justify-center rounded-md bg-tertiary border-2 border-subtle">

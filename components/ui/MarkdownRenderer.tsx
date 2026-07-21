@@ -11,7 +11,7 @@ import type { Components } from 'react-markdown';
 const MermaidBlock = dynamic(
   () => import('./MermaidBlock').then((m) => m.MermaidBlock),
   { ssr: false, loading: () => (
-    <div className="my-4 flex items-center gap-2 rounded-xl border border-subtle bg-tertiary p-4">
+    <div className="my-4 flex items-center gap-2 !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] bg-tertiary p-4">
       <Wand2 className="size-3 animate-wand-swing text-gemini-blue" />
       <span className="text-xs text-tertiary">Memuat diagram...</span>
     </div>
@@ -30,7 +30,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1 rounded-lg border border-subtle bg-[rgba(255,255,255,0.05)] px-2 py-1 text-[10px] font-semibold text-tertiary transition-all hover:text-primary hover:bg-[rgba(255,255,255,0.1)]"
+      className="flex items-center gap-1 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] bg-[rgba(255,255,255,0.05)] px-2 py-1 text-[10px] font-semibold text-tertiary transition-all hover:text-primary hover:bg-[rgba(255,255,255,0.1)]"
     >
       {copied ? <Check size={10} className="text-gemini-green" /> : <Copy size={10} />}
       {copied ? 'Copied!' : 'Copy'}
@@ -80,7 +80,7 @@ const markdownComponents: Components = {
     </li>
   ),
   blockquote: ({ children }) => (
-    <blockquote className="my-4 border-l-4 border-gemini-blue/40 bg-gemini-blue/5 py-2 pl-4 pr-3 rounded-r-xl">
+    <blockquote className="my-4 border-l-4 border-gemini-blue/40 bg-gemini-blue/5 py-2 pl-4 pr-3 !rounded-none">
       <div className="text-sm italic text-secondary">{children}</div>
     </blockquote>
   ),
@@ -104,7 +104,7 @@ const markdownComponents: Components = {
     <hr className="my-6 border-subtle" />
   ),
   table: ({ children }) => (
-    <div className="my-4 overflow-x-auto rounded-xl border border-subtle">
+    <div className="my-4 overflow-x-auto !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)]">
       <table className="w-full text-sm">
         {children}
       </table>
@@ -140,7 +140,7 @@ const markdownComponents: Components = {
     if (isInline) {
       return (
         <code
-          className="rounded-md bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-gemini-blue border border-subtle"
+          className="!rounded-none bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-gemini-blue border border-subtle"
           {...props}
         >
           {children}
@@ -164,7 +164,7 @@ const markdownComponents: Components = {
     }
 
     return (
-      <div className="group relative my-4 overflow-hidden rounded-xl border border-subtle bg-[var(--bg-tertiary)]">
+      <div className="group relative my-4 overflow-hidden !rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] bg-[var(--bg-tertiary)]">
         <div className="flex items-center justify-between border-b border-subtle px-4 py-2">
           {lang && (
             <span className="text-[10px] font-bold uppercase tracking-wider text-tertiary">
