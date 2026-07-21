@@ -141,7 +141,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                           const modeParam = s.has_n8n ? '&mode=n8n' : '';
                           router.push(`/generate/results?session_id=${s.id}${modeParam}`);
                         }}
-                        className={`shrink-0 !rounded-none p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 border-2 border-transparent md:group-hover:opacity-100 active:translate-x-[1px] active:translate-y-[1px] ${
+                        className={`shrink-0 !rounded-none p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 border-2 border-transparent md:group-hover:opacity-100 active:translate-y-[1px] ${
                           isActive ? 'hover:border-border hover:bg-white/20' : 'hover:border-border hover:bg-white hover:text-gemini-teal hover:shadow-[2px_2px_0_var(--border)]'
                         }`}
                         title={s.has_n8n ? 'View n8n Workflow' : 'View Docs'}
@@ -151,7 +151,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                     )}
                     <button
                       onClick={(e) => handleDeleteClick(s, e)}
-                      className={`shrink-0 !rounded-none p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 border-2 border-transparent md:group-hover:opacity-100 active:translate-x-[1px] active:translate-y-[1px] ${
+                      className={`shrink-0 !rounded-none p-1.5 max-md:opacity-100 md:opacity-0 transition-all duration-200 border-2 border-transparent md:group-hover:opacity-100 active:translate-y-[1px] ${
                         isActive ? 'hover:border-border hover:bg-gemini-red/50 hover:text-[#fff]' : 'hover:border-border hover:bg-gemini-red hover:text-[#fff] hover:shadow-[2px_2px_0_var(--border)]'
                       }`}
                     >

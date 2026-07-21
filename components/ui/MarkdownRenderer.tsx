@@ -30,7 +30,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className="flex items-center gap-1 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] bg-[rgba(255,255,255,0.05)] px-2 py-1 text-[10px] font-semibold text-tertiary transition-all hover:text-primary hover:bg-[rgba(255,255,255,0.1)]"
+      className="flex items-center gap-1 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] bg-[rgba(255,255,255,0.05)] px-2 py-1 text-[10px] font-semibold text-tertiary transition-all hover:text-primary hover:bg-[rgba(255,255,255,0.1)] active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)]"
     >
       {copied ? <Check size={10} className="text-gemini-green" /> : <Copy size={10} />}
       {copied ? 'Copied!' : 'Copy'}

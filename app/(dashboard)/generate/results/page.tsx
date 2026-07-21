@@ -428,14 +428,14 @@ function GenerateResultsContent() {
         <div className="flex items-center gap-2 sm:gap-3 self-end sm:self-auto">
           <button
             onClick={() => router.push(`/chat?id=${sessionId}`)}
-            className="!rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary"
+            className="!rounded-none border-2 border-border shadow-[3px_3px_0_var(--border)] px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
           >
             Back to Chat
           </button>
           <button
                   data-testid="download-button"
                   onClick={handleDownloadAll}
-            className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold"
+            className="btn-gradient flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 lg:px-5 py-1.5 sm:py-2 lg:py-2.5 text-xs sm:text-sm font-semibold shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
           >
             <Archive className="size-3 sm:size-4" />
             <span className="hidden sm:inline">Download All (.zip)</span>
@@ -455,7 +455,7 @@ function GenerateResultsContent() {
               key={name}
               onClick={() => hasFile && !isRegenerating && setActiveFile(name)}
               disabled={!hasFile || isRegenerating}
-              className={`shrink-0 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 ${
+              className={`shrink-0 !rounded-none border-2 border-border shadow-[2px_2px_0_var(--border)] px-2.5 py-1.5 text-xs font-semibold whitespace-nowrap transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)] ${
                 isActive && hasFile
                   ? 'bg-gemini-blue/10 text-gemini-blue border border-gemini-blue/20'
                   : hasFile

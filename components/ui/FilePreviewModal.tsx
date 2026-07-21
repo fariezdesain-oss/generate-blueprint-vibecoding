@@ -66,14 +66,14 @@ export function FilePreviewModal({ attachment, onClose }: FilePreviewModalProps)
               onClick={() => {
                 if (url) window.open(url, '_blank');
               }}
-              className="rounded-lg p-1.5 text-tertiary transition-colors hover:bg-tertiary hover:text-secondary"
+              className="rounded-lg p-1.5 border-2 border-border text-tertiary transition-colors hover:bg-tertiary hover:text-secondary shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
               title="Download"
             >
               <Download size={16} />
             </button>
             <button
               onClick={onClose}
-              className="rounded-lg p-1.5 text-tertiary transition-colors hover:bg-tertiary hover:text-secondary"
+              className="rounded-lg p-1.5 text-tertiary transition-colors hover:bg-tertiary hover:text-secondary active:translate-y-[1px]"
             >
               <X size={16} />
             </button>

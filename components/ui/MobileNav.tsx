@@ -39,7 +39,7 @@ export function MobileNav() {
             onClick={() => setOpen(true)}
             className="!rounded-none border-2 border-transparent p-1 text-tertiary transition-all duration-200 hover:border-border hover:bg-tertiary hover:text-primary active:translate-x-[1px] active:translate-y-[1px]"
           >
-            <Menu size={24} className="stroke-[2.5px]" />
+            <Menu size={18} className="stroke-[2.5px]" />
           </button>
         </div>
       </header>
@@ -65,7 +65,7 @@ export function MobileNav() {
                 onClick={() => setOpen(false)}
                 className="!rounded-none border-2 border-transparent p-1 text-tertiary transition-all duration-200 hover:border-border hover:bg-tertiary hover:text-primary active:translate-x-[1px] active:translate-y-[1px]"
               >
-                <X size={20} className="stroke-[2.5px]" />
+                <X size={18} className="stroke-[2.5px]" />
               </button>
             </div>
 

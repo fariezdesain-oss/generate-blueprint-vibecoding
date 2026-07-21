@@ -87,7 +87,7 @@ export function FilePicker({ sessionId, onFilesReady, disabled }: FilePickerProp
               e.stopPropagation();
               removeFile(att.id);
             }}
-            className="ml-0.5 !rounded-none border-2 border-transparent p-0.5 text-tertiary opacity-0 transition-all duration-200 group-hover:opacity-100 hover:border-border hover:bg-gemini-red hover:text-white"
+            className="ml-0.5 !rounded-none border-2 border-transparent p-0.5 text-tertiary opacity-0 transition-all duration-200 group-hover:opacity-100 hover:border-border hover:bg-gemini-red hover:text-white active:translate-y-[1px]"
           >
             <X size={12} className="stroke-[2.5px]" />
           </div>

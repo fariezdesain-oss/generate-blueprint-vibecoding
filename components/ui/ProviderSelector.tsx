@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Pencil, Play, Power, Trash2, Wand2 } from 'lucide-react';
 
 interface ProviderItem {
@@ -216,8 +217,8 @@ export function ProviderSelector() {
 
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8">
-      {notification && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+      {notification && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-4">
           <div className={`animate-fade-in-up mx-4 w-full max-w-sm brutal-card !rounded-none p-6 sm:p-8 text-center !shadow-[6px_6px_0_var(--border)] ${
             notification.type === 'success'
               ? 'border-emerald-500'
@@ -252,7 +253,8 @@ export function ProviderSelector() {
               OK
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="space-y-4">
@@ -363,14 +365,14 @@ export function ProviderSelector() {
         </div>
       </div>
 
-      {showFormModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+      {showFormModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-4">
           <div className="animate-fade-in-up w-full max-w-lg brutal-card !rounded-none bg-secondary p-6 sm:p-8 !shadow-[6px_6px_0_var(--border)] overflow-y-auto max-h-[90vh]">
             <h3 className="mb-2 text-xl font-black uppercase tracking-widest text-primary text-center">
               {editingProviderId ? 'Edit Provider' : 'Add Provider'}
             </h3>
             <div className="mx-auto mb-6 mt-2 h-[2px] w-16 bg-border" />
-            
+
             <form onSubmit={handleSave} className="space-y-4 text-left">
               <div>
                 <label className="mb-1.5 block text-sm font-bold text-secondary">Provider</label>
@@ -469,11 +471,12 @@ export function ProviderSelector() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+      {deleteTargetId && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-overlay p-4">
           <div className="animate-fade-in-up mx-4 w-full max-w-sm brutal-card !rounded-none p-6 sm:p-8 text-center !shadow-[6px_6px_0_var(--border)]">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center !rounded-none bg-gemini-red border-2 border-border">
               <svg className="size-7 text-[#111]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -498,7 +501,8 @@ export function ProviderSelector() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

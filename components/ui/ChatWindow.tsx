@@ -86,7 +86,7 @@ export const ChatWindow = memo(function ChatWindow({ loadingMessages }: { loadin
 
         {isGenerating && !streamingContent && (
           <div className="flex justify-start">
-            <div className="!rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)] px-4 py-4 brutal-panel">
+            <div className="!rounded-none border-2 border-border shadow-[4px_4px_0_var(--border)] px-4 py-4 brutal-panel transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]">
               <div className="flex gap-1.5">
                 <span className="typing-dot" />
                 <span className="typing-dot" />

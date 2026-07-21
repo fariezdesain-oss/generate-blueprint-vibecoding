@@ -43,7 +43,7 @@ function AttachmentPreview({ att }: { att: Attachment }) {
   }
 
   return (
-      <div className="mb-2 flex items-center gap-2 !rounded-none border-2 border-border bg-secondary shadow-[2px_2px_0_var(--border)] px-3 py-2">
+      <div className="mb-2 flex items-center gap-2 !rounded-none border-2 border-border bg-secondary shadow-[2px_2px_0_var(--border)] px-3 py-2 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] active:shadow-[1px_1px_0_var(--border)] cursor-pointer">
       {isImage ? (
         <ImageIcon size={16} className="text-gemini-blue/70" />
       ) : (

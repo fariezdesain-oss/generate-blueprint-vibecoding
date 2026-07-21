@@ -909,14 +909,14 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
                     setPickedModeTemp(null);
                     setTitleInput('');
                   }}
-                  className="min-h-11 !rounded-none border-2 border-border bg-tertiary shadow-[3px_3px_0_var(--border)] px-4 text-sm font-bold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 !rounded-none border-2 border-border bg-tertiary shadow-[3px_3px_0_var(--border)] px-4 text-sm font-bold text-secondary transition-all duration-200 hover:bg-tertiary hover:text-primary active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:translate-x-0 disabled:active:translate-y-0 disabled:active:shadow-[3px_3px_0_var(--border)]"
                 >
                   Kembali
                 </button>
                 <button
                   type="submit"
                   disabled={pickingMode || !titleInput.trim()}
-                  className="min-h-11 !rounded-none btn-gradient shadow-[3px_3px_0_var(--border)] px-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:transform-none"
+                  className="min-h-11 !rounded-none btn-gradient shadow-[3px_3px_0_var(--border)] px-4 text-sm font-bold active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none disabled:transform-none"
                 >
                   {pickingMode ? 'Membuat...' : 'Mulai Chat'}
                 </button>
@@ -1080,7 +1080,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
             <p className="text-xs sm:text-sm text-secondary">{chatError}</p>
             <button
               onClick={() => setChatError(null)}
-              className="mt-4 sm:mt-5 w-full !rounded-none bg-gemini-red border-2 border-border text-[#111] font-black uppercase shadow-[3px_3px_0_var(--border)] hover:bg-gemini-red/90 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white transition-all duration-200 hover:bg-red-400"
+              className="mt-4 sm:mt-5 w-full !rounded-none bg-gemini-red border-2 border-border text-[#111] font-black uppercase shadow-[3px_3px_0_var(--border)] hover:bg-gemini-red/90 py-2 sm:py-2.5 text-xs sm:text-sm font-medium text-white transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
             >
               OK
             </button>
