@@ -33,7 +33,7 @@ export function withAuth(handler: AuthenticatedApiHandler) {
 
     const THIRTY_MIN_MS = 30 * 60 * 1000;
     const lastActivity = profile?.last_activity_at
-      ? new Date(profile.last_activity_at).getTime()
+      ? new Date(profile.last_activity_at as string).getTime()
       : Date.now(); // Jika null, anggap baru aktif (mencegah user baru ter-kick)
 
     // Ignore inactivity check on the heartbeat endpoint itself to avoid infinite loops or deadlocks on session resume.

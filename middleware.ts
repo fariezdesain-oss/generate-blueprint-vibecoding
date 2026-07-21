@@ -46,7 +46,7 @@ export async function middleware(request: NextRequest) {
 
       const THIRTY_MIN_MS = 30 * 60 * 1000;
       const lastActivity = profile?.last_activity_at
-        ? new Date(profile.last_activity_at).getTime()
+        ? new Date(profile.last_activity_at as string).getTime()
         : Date.now(); // Jika null, anggap baru aktif (mencegah user baru ter-kick langsung)
       const lastSignIn = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
 
