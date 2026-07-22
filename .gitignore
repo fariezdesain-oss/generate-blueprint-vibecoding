@@ -44,3 +44,4 @@ session-ses_*.md
 test-results/
 .playwright-mcp/
 pictures/
+graphify-out/
