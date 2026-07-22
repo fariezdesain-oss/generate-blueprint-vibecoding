@@ -4,6 +4,8 @@ import {
   countGeneratedSpecFiles,
   getNextMissingSpecFile,
   hasAllSpecFiles,
+  buildConsistencyPrompt,
+  buildSingleFileConsistencyPrompt,
 } from '@/lib/utils/sequentialPrompts';
 
 describe('sequentialPrompts', () => {
@@ -88,3 +90,118 @@ describe('sequentialPrompts', () => {
     expect(prompt).toContain('Ready-to-copy prompt template');
   });
 });
+
+  describe('formatOtherFiles', () => {
+    it('should format other files properly using extractDocumentSummary when previewLimit > 0', () => {
+      const files = {
+        '01_PRD.md': 'PRD Content',
+        '02_ARCHITECTURE.md': 'Architecture Content\nLine 2\nLine 3',
+        '03_DATA_MODELS.md': 'Data Models Content\nLine 2\nLine 3'
+      };
+      
+      const prompt = buildFilePrompt(3, [{ role: 'user', content: 'app' }], files, 15); // limit to 15 chars so summary truncates
+      expect(prompt).toContain('--- 02_ARCHITECTURE.md (REFERENSI) ---');
+      expect(prompt).toContain('--- 03_DATA_MODELS.md (REFERENSI) ---');
+    });
+  });
+
+  describe('checkConversation', () => {
+    it('should return insufficient context message if no context or goal', () => {
+      const prompt = buildFilePrompt(0, [{ role: 'user', content: 'hello' }], {});
+      expect(prompt).toBe('INSUFFICIENT_CONTEXT: Maaf, percakapan ini belum memiliki detail proyek yang cukup. Silakan lanjutkan diskusi dan tentukan dulu proyek atau program apa yang ingin Anda bangun.');
+    });
+
+    it('should pass checkConversation if it has problem/goal keywords', () => {
+      const prompt = buildFilePrompt(0, [{ role: 'user', content: 'saya butuh sistem baru' }], {});
+      expect(prompt).not.toContain('INSUFFICIENT_CONTEXT');
+    });
+  });
+
+  describe('buildConsistencyPrompt', () => {
+    it('should return empty string if no PRD', () => {
+      const prompt = buildConsistencyPrompt({});
+      expect(prompt).toBe('');
+    });
+
+    it('should build consistency prompt including PRD and summaries of other files', () => {
+      const files = {
+        '01_PRD.md': 'This is PRD',
+        '02_ARCHITECTURE.md': 'This is Arch',
+      };
+      const prompt = buildConsistencyPrompt(files);
+      expect(prompt).toContain('Periksa KONSISTENSI 9 dokumen');
+      expect(prompt).toContain('--- 01_PRD.md (ACUAN UTAMA - LENGKAP) ---');
+      expect(prompt).toContain('This is PRD');
+      expect(prompt).toContain('--- 02_ARCHITECTURE.md (RINGKASAN) ---');
+      expect(prompt).toContain('This is Arch');
+    });
+  });
+
+  describe('buildSingleFileConsistencyPrompt', () => {
+    it('should return empty string if no PRD or checking PRD itself', () => {
+      expect(buildSingleFileConsistencyPrompt('02_ARCHITECTURE.md', 'content', {})).toBe('');
+      expect(buildSingleFileConsistencyPrompt('01_PRD.md', 'content', { '01_PRD.md': 'PRD' })).toBe('');
+    });
+
+    it('should build single file consistency prompt', () => {
+      const files = {
+        '01_PRD.md': 'This is PRD',
+        '03_DATA_MODELS.md': 'This is Data',
+      };
+      const prompt = buildSingleFileConsistencyPrompt('02_ARCHITECTURE.md', 'Arch content', files);
+      expect(prompt).toContain('Periksa apakah file 02_ARCHITECTURE.md konsisten dengan 01_PRD.md');
+      expect(prompt).toContain('--- 01_PRD.md (SOURCE OF TRUTH) ---');
+      expect(prompt).toContain('This is PRD');
+      expect(prompt).toContain('--- 03_DATA_MODELS.md (REFERENSI KONSISTENSI) ---');
+      expect(prompt).toContain('This is Data');
+      expect(prompt).toContain('--- 02_ARCHITECTURE.md (FILE HASIL REGENERATE) ---');
+      expect(prompt).toContain('Arch content');
+    });
+  });
+
+  describe('buildFilePrompt for remaining switch cases', () => {
+    const messages = [{ role: 'user', content: 'membuat aplikasi' }];
+    const files = { '01_PRD.md': 'Very long PRD content ' + 'A'.repeat(8500) };
+
+    it('should generate ARCHITECTURE prompt', () => {
+      const prompt = buildFilePrompt(1, messages, files);
+      expect(prompt).toContain('02_ARCHITECTURE.md');
+      expect(prompt).toContain('HANYA membahas "bagaimana sistem dibangun"');
+      expect(prompt).toContain('[CATATAN: PRD di atas sangat lengkap. Fokus pada informasi yang RELEVAN untuk dokumen ini saja.');
+    });
+
+    it('should generate DATA_MODELS prompt', () => {
+      const prompt = buildFilePrompt(2, messages, files);
+      expect(prompt).toContain('03_DATA_MODELS.md');
+      expect(prompt).toContain('HANYA membahas semua hal yang berhubungan dengan data');
+    });
+
+    it('should generate PROJECT_STANDARDS prompt', () => {
+      const prompt = buildFilePrompt(3, messages, files);
+      expect(prompt).toContain('04_PROJECT_STANDARDS.md');
+      expect(prompt).toContain('menggabungkan standar coding/proyek dan environment schema');
+    });
+
+    it('should generate DESIGN_SYSTEM prompt', () => {
+      const prompt = buildFilePrompt(4, messages, files);
+      expect(prompt).toContain('05_DESIGN_SYSTEM.md');
+      expect(prompt).toContain('HANYA membahas visual dan pengalaman antarmuka');
+    });
+
+    it('should generate DELIVERY prompt', () => {
+      const prompt = buildFilePrompt(5, messages, files);
+      expect(prompt).toContain('06_DELIVERY.md');
+      expect(prompt).toContain('menggabungkan testing, security, dan delivery/release');
+    });
+
+    it('should generate AGENT_CONTEXT prompt', () => {
+      const prompt = buildFilePrompt(6, messages, files);
+      expect(prompt).toContain('07_AGENT_CONTEXT.md');
+      expect(prompt).toContain('dibuat TERAKHIR sebagai root context ringkas untuk AI agent');
+    });
+
+    it('should generate fallback prompt for unknown file', () => {
+      const prompt = buildFilePrompt(99, messages, files);
+      expect(prompt).toContain('Buat dokumen undefined berdasarkan percakapan dan dokumen sebelumnya.');
+    });
+  });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronRight, FileJson, X , Wand2} from 'lucide-react';
+import { ChevronRight, FileJson, Wand2 } from 'lucide-react';
 import type { ProjectState } from '@/lib/utils/projectState';
 
 interface ProjectStatePanelProps {

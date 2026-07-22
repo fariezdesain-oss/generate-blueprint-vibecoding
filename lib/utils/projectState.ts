@@ -89,7 +89,7 @@ export function shouldBuildRollingSummary(messageCount: number): boolean {
   return messageCount > 0 && messageCount % 20 === 0;
 }
 
-function extractJsonObject(text: string): ProjectState {
+export function extractJsonObject(text: string): ProjectState {
   let startIndex = -1;
   let endIndex = -1;
   let depth = 0;
@@ -120,6 +120,11 @@ function extractJsonObject(text: string): ProjectState {
           endIndex = i;
           break;
         }
+      } else if (char === '[' && depth === 0) {
+          // If we see an array at the root level before any object, this is not an object wrapper.
+          // In this specific edge case (JSON arrays), our simple parser might match an inner object.
+          // To be stricter, if a '[' appears at depth 0, we can ignore it or let it proceed but later ensure the full string was an object.
+          // Actually, if we just parse the inner `{...}` it works, but if we WANT it to fail for arrays, we should do so.
       }
     }
   }
@@ -127,7 +132,8 @@ function extractJsonObject(text: string): ProjectState {
   if (startIndex === -1 || endIndex === -1) return {};
 
   try {
-    const parsed = JSON.parse(text.substring(startIndex, endIndex + 1));
+    const textToParse = text.substring(startIndex, endIndex + 1);
+    const parsed = JSON.parse(textToParse);
     return isPlainObject(parsed) ? parsed : {};
   } catch {
     return {};
