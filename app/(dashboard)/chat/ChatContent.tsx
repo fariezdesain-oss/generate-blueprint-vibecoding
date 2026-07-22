@@ -964,7 +964,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
               </div>
               <button
                 onClick={() => stopPolling(true)}
-                className="flex min-h-11 items-center gap-2 !rounded-none border-2 border-border bg-gemini-red py-2 px-4 text-sm font-black uppercase text-[#111] transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
+                className="flex min-h-11 items-center gap-2 !rounded-none border-2 border-border bg-gemini-red py-2 px-4 text-sm font-black uppercase text-white transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]"
               >
                 <Square className="size-4 fill-current" />
                 Hentikan Generate
@@ -1056,7 +1056,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
               </div>
               <button
                 onClick={() => stopPolling(true)}
-                className="flex min-h-11 items-center gap-2 !rounded-none border-2 border-border bg-gemini-red py-2 px-4 text-sm font-black uppercase text-[#111] transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                className="flex min-h-11 items-center gap-2 !rounded-none border-2 border-border bg-gemini-red py-2 px-4 text-sm font-black uppercase text-white transition-all duration-200 hover:bg-gemini-red/90 shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
               >
                 <Square className="size-4 fill-current" />
                 Hentikan Generate
@@ -1073,7 +1073,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay backdrop-blur-sm">
           <div className="animate-fade-in-up mx-4 w-full max-w-sm glass !rounded-none border-2 border-border bg-secondary shadow-[6px_6px_0_var(--border)] p-5 sm:p-6 text-center shadow-2xl">
             <div className="mx-auto mb-3 sm:mb-4 flex size-12 sm:size-14 items-center justify-center !rounded-none bg-gemini-red border-2 border-border shadow-[2px_2px_0_var(--border)]">
-              <svg className="size-5 sm:size-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="size-5 sm:size-7 text-[#111]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>

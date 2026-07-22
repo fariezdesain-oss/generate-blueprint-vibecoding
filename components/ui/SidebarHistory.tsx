@@ -116,7 +116,7 @@ export function SidebarHistory({ onItemClick }: { onItemClick?: () => void }) {
                   onItemClick?.();
                   router.push(`/chat?id=${s.id}`);
                 }}
-                className={`group flex cursor-pointer items-center gap-2 !rounded-none px-3 py-2.5 text-sm transition-all duration-200 border-2 border-border ${
+                className={`group flex cursor-pointer items-center gap-2 !rounded-none px-2 py-1.5 text-xs font-bold uppercase transition-all duration-200 border-2 border-border ${
                   isActive
                     ? 'bg-gemini-blue text-white font-bold shadow-[3px_3px_0_var(--border)] translate-x-[1px] translate-y-[1px]'
                     : 'bg-secondary text-secondary font-semibold hover:bg-tertiary hover:text-primary hover:shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)]'

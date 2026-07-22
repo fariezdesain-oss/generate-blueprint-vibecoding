@@ -106,7 +106,7 @@ export function FilePicker({ sessionId, onFilesReady, disabled }: FilePickerProp
               type="button"
               onClick={() => inputRef.current?.click()}
               disabled={disabled}
-              className="flex items-center gap-2 !rounded-none border-2 border-dashed border-border px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-secondary transition-all duration-200 hover:border-solid hover:bg-tertiary hover:text-primary hover:shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:translate-x-0 disabled:active:translate-y-0"
+              className="flex items-center gap-2 !rounded-none border-2 border-dashed border-[#10b981] dark:border-border px-3 py-1.5 text-xs font-bold uppercase tracking-widest text-secondary transition-all duration-200 hover:border-solid hover:bg-tertiary hover:text-primary hover:shadow-[3px_3px_0_var(--border)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[1px_1px_0_var(--border)] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none disabled:active:translate-x-0 disabled:active:translate-y-0"
             >
               <Paperclip size={14} className="stroke-[2.5px]" />
               Attach

@@ -54,23 +54,13 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
 
   if (!isOpen) {
     return (
-      <>
-        <button
-          onClick={() => setIsOpen(true)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 bg-gemini-orange border-2 border-r-0 border-border !rounded-none p-2.5 text-[#111] hover:bg-gemini-blue hover:text-white transition-colors shadow-[-4px_4px_0_var(--border)] hidden md:block z-40 active:translate-x-[-2px] active:shadow-[-2px_4px_0_var(--border)]"
-          title="Buka Project State"
-        >
-          <FileJson size={20} className="stroke-[2.5px]" />
-        </button>
-
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed right-4 bottom-24 bg-gemini-orange text-[#111] border-2 border-border !rounded-none p-3 shadow-[4px_4px_0_var(--border)] md:hidden z-40 animate-fade-in-up active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0_var(--border)]"
-          title="Buka Project State"
-        >
-          <FileJson size={20} className="stroke-[2.5px]" />
-        </button>
-      </>
+      <button
+        onClick={() => setIsOpen(true)}
+        className="absolute right-0 top-1/2 -translate-y-1/2 bg-gemini-orange border-2 border-r-0 border-border !rounded-none p-2.5 text-[#111] hover:bg-gemini-blue hover:text-white transition-colors shadow-[-4px_4px_0_var(--border)] z-40 active:translate-x-[-2px] active:shadow-[-2px_4px_0_var(--border)]"
+        title="Buka Project State"
+      >
+        <FileJson size={20} className="stroke-[2.5px]" />
+      </button>
     );
   }
 
@@ -107,8 +97,7 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
           onClick={() => setIsOpen(false)}
           className="p-1 !rounded-none border-2 border-transparent hover:border-[#111] text-[#111] transition-all active:translate-x-[1px] active:translate-y-[1px]"
         >
-          <span className="hidden md:block"><ChevronRight size={18} className="stroke-[2.5px]" /></span>
-          <span className="block md:hidden"><X size={18} className="stroke-[2.5px]" /></span>
+          <ChevronRight size={18} className="stroke-[2.5px]" />
         </button>
       </div>
 
@@ -158,20 +147,16 @@ export function ProjectStatePanel({ sessionId }: ProjectStatePanelProps) {
   return (
     <>
       {/* Mobile Backdrop */}
-      <div 
+      <div
         className="fixed inset-0 bg-overlay z-40 md:hidden animate-fade-in"
         onClick={() => setIsOpen(false)}
       />
-      
-      {/* Desktop Sidebar & Mobile Bottom Sheet */}
+
+      {/* Desktop Sidebar & Mobile Floating Tab */}
       <div className={`
-        fixed inset-x-0 bottom-0 z-50 h-[75vh] flex flex-col bg-secondary !rounded-none border-t-2 border-border shadow-[0_-4px_0_var(--border)] transition-transform duration-300 transform translate-y-0
-        md:relative md:inset-auto md:h-full md:w-80 md:rounded-none md:border-t-0 md:border-l-2 md:shadow-[-4px_0_0_var(--border)] md:translate-y-0 md:flex md:z-auto
+        fixed inset-y-0 right-0 z-50 h-full w-[85%] sm:w-80 flex flex-col bg-secondary !rounded-none border-l-2 border-border shadow-[-4px_0_0_var(--border)] transition-transform duration-300
+        md:relative md:inset-auto md:h-full md:w-80 md:z-auto
       `}>
-        {/* Mobile Pull Indicator */}
-        <div className="w-full flex justify-center py-2 md:hidden cursor-pointer bg-gemini-orange border-b-2 border-border shrink-0" onClick={() => setIsOpen(false)}>
-          <div className="w-12 h-1.5 bg-[#111] !rounded-none" />
-        </div>
         {panelContent}
       </div>
     </>

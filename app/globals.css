@@ -111,10 +111,10 @@ button, a, input, select, textarea { touch-action: manipulation; }
   .input-gemini.input-password { border-color: var(--gemini-green); box-shadow: 2px 2px 0 var(--gemini-green); }
   .input-gemini.input-password:focus { border-color: var(--gemini-green); box-shadow: 3px 3px 0 var(--gemini-green); }
   
-  .dark .input-gemini.input-email { border-color: var(--gemini-orange); box-shadow: 2px 2px 0 var(--gemini-orange); }
-  .dark .input-gemini.input-email:focus { border-color: var(--gemini-orange); box-shadow: 3px 3px 0 var(--gemini-orange); }
-  .dark .input-gemini.input-password { border-color: var(--gemini-red); box-shadow: 2px 2px 0 var(--gemini-red); }
-  .dark .input-gemini.input-password:focus { border-color: var(--gemini-red); box-shadow: 3px 3px 0 var(--gemini-red); }
+  .dark .input-gemini.input-email { border-color: var(--gemini-blue); box-shadow: 2px 2px 0 var(--gemini-blue); }
+  .dark .input-gemini.input-email:focus { border-color: var(--gemini-blue); box-shadow: 3px 3px 0 var(--gemini-blue); }
+  .dark .input-gemini.input-password { border-color: var(--gemini-green); box-shadow: 2px 2px 0 var(--gemini-green); }
+  .dark .input-gemini.input-password:focus { border-color: var(--gemini-green); box-shadow: 3px 3px 0 var(--gemini-green); }
 
   .brutal-icon {
     display: flex;
