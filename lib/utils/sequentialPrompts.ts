@@ -65,13 +65,13 @@ function formatOtherFiles(files: Record<string, string>, previewLimit: number = 
 const BASE_SYSTEM = `Anda adalah senior software architect dan technical writer. Output Anda harus presisi, terstruktur, dan lengkap. WAJIB GUNAKAN BAHASA INDONESIA.
 
 ATURAN KUALITAS:
-1. KONSISTENSI - 9 dokumen dalam satu proyek HARUS konsisten satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika ada konflik, ikuti 01_PRD.md.
+1. KONSISTENSI KETAT - 9 dokumen dalam satu proyek HARUS konsisten secara absolut satu sama lain. 01_PRD.md adalah ACUAN UTAMA. Jika Anda diberikan file yang sudah di-generate sebelumnya (sebagai REFERENSI DOKUMEN SEBELUMNYA), Anda WAJIB merujuk padanya. DILARANG KERAS mengubah arsitektur, tech stack, skema database, atau nama variabel yang sudah didefinisikan di dokumen sebelumnya.
 2. BATAS DOKUMEN - tulis hanya topik yang diminta pada dokumen saat ini. Jangan mencampur PRD, arsitektur, data model, standar proyek, design system, delivery, dan agent context.
 3. DILARANG placeholder - jangan gunakan "TODO", "TBD", "sesuaikan dengan kebutuhan", "ganti dengan...", atau kata serupa. Semua konten harus terisi dengan nilai SPESIFIK dan KONKRET.
 4. LENGKAP - setiap bagian yang disebutkan dalam template harus diisi. Jangan lewati bagian manapun.
 5. SPESIFIK - gunakan contoh konkret, bukan abstraksi. Misalnya jangan tulis "framework populer" tapi tulis "Next.js 14.2 dengan App Router".
-6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md. Jika ada konflik, 01_PRD.md selalu menang.
-7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi. Jika informasi tidak ada: BERHENTI dan minta klarifikasi. JANGAN mengisi dengan asumsi. JANGAN melanjutkan dengan konteks yang tidak jelas. Setiap klaim teknis harus bisa ditelusuri ke percakapan user atau dokumen sebelumnya.
+6. CROSS-REFERENCE - setiap klaim teknis harus konsisten dengan 01_PRD.md dan DOKUMEN SEBELUMNYA. Jika ada konflik, 01_PRD.md selalu menang, diikuti oleh dokumen dengan nomor urut lebih kecil.
+7. ZERO HALLUCINATION - jangan mengarang fitur, teknologi, tabel, API, atau requirement yang tidak ada di percakapan atau dokumen referensi. Jika informasi tidak ada: BERHENTI dan minta klarifikasi. JANGAN mengisi dengan asumsi. Setiap klaim teknis harus bisa ditelusuri ke dokumen sebelumnya.
 8. URUTAN IMPLEMENTASI - 08_TASKS.md WAJIB menyusun phase dengan urutan: FASE 1 setup dan konfigurasi awal proyek; FASE 2 desain dan implementasi UI (halaman, komponen, routing, state); FASE 3 integrasi API/backend dari sisi frontend (fetch, form, auth flow di UI); FASE 4 backend/API logic (endpoint, database, business logic); FASE 5 integrasi penuh frontend-backend; FASE 6 testing, security, deployment. AI implementer WAJIB mengerjakan FASE 2 sebelum FASE 4.`;
 
 function checkConversation(messages: { role: string; content: string }[]): boolean {
@@ -129,26 +129,27 @@ export function buildSingleFileConsistencyPrompt(
     .map((name) => {
       const content = files[name];
       const text = extractDocumentSummary(content, previewLimit);
-      return `--- ${name} (REFERENSI KONSISTENSI) ---\n${text}`;
+      return `--- ${name} (REFERENSI KONSISTENSI - WAJIB DIIKUTI) ---\n${text}`;
     })
     .join('\n\n');
 
-  return `Anda adalah senior QA document reviewer. Periksa apakah file ${fileName} konsisten dengan 01_PRD.md dan dokumen referensi lain.
+  return `Anda adalah senior QA document reviewer sekaligus system architect. Tugas Anda adalah melakukan REGENERATE pada file ${fileName} dan memastikan konsistensinya dengan 01_PRD.md dan dokumen referensi lain yang sudah ada.
 
-ATURAN:
+ATURAN REGENERATE:
 1. 01_PRD.md adalah source of truth utama.
-2. Jangan menambah fitur, teknologi, tabel, API, atau scope baru yang tidak ada di 01_PRD.md.
-3. Jangan mengubah topik utama file ${fileName}.
-4. Jika file sudah konsisten, balas hanya: KONSISTEN
-5. Jika perlu diperbaiki, keluarkan ulang HANYA isi lengkap file ${fileName}, diawali dengan "# ${fileName}".
+2. DOKUMEN REFERENSI LAINNYA ADALAH FINAL. Anda tidak boleh menentang arsitektur, tech stack, skema database, atau nama variabel yang sudah ada di dokumen referensi.
+3. Jangan menambah fitur, teknologi, tabel, API, atau scope baru yang tidak ada di 01_PRD.md atau dokumen referensi.
+4. Jaga topik utama file ${fileName} sesuai dengan batasan scope dokumennya (jangan campur aduk).
+5. Jika file sudah konsisten dan tidak perlu perbaikan, balas HANYA dengan teks: KONSISTEN
+6. Jika perlu diperbaiki atau di-regenerate, keluarkan HANYA isi lengkap file ${fileName} yang baru dan sudah konsisten, diawali dengan "# ${fileName}". Jangan beri komentar tambahan.
 
 --- 01_PRD.md (SOURCE OF TRUTH) ---
 ${prdContent}
 
-${otherFiles ? `${otherFiles}\n\n` : ''}--- ${fileName} (FILE HASIL REGENERATE) ---
+${otherFiles ? `${otherFiles}\n\n` : ''}--- ${fileName} (FILE YANG HARUS DI-REGENERATE / DIPERIKSA) ---
 ${fileContent}
 
-Balas "KONSISTEN" atau keluarkan ulang file ${fileName} yang sudah diperbaiki.`;
+Balas "KONSISTEN" jika sudah sempurna, atau keluarkan ulang seluruh isi file ${fileName} yang sudah diperbaiki.`;
 }
 
 export function buildFilePrompt(

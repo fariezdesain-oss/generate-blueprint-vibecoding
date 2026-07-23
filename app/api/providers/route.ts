@@ -14,7 +14,7 @@ export const GET = withAuth(async (
     .from('provider_configs')
     .select('id, provider_name, model_name, api_key, base_url, is_active, created_at, updated_at')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: false });
 
   if (error) {
     return NextResponse.json(
