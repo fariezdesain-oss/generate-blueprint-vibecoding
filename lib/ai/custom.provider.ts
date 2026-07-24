@@ -61,7 +61,9 @@ export class OpenAICompatibleProvider implements AIProvider {
         body: JSON.stringify({
           model: config.modelName,
           messages: [{ role: 'user', content }],
-          max_tokens: maxTokens,
+          stream: false,
+          // Hanya kirim max_tokens jika bukan koneksi ke IP lokal (127.0.0.1 atau localhost)
+          ...(baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') ? {} : { max_tokens: maxTokens }),
         }),
         signal: controller.signal,
       });
@@ -96,7 +98,8 @@ export class OpenAICompatibleProvider implements AIProvider {
         model: config.modelName,
         messages: [{ role: 'user', content }],
         stream: true,
-        max_tokens: maxTokens,
+        // Hanya kirim max_tokens jika bukan koneksi ke IP lokal (127.0.0.1 atau localhost)
+        ...(baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') ? {} : { max_tokens: maxTokens }),
       }),
       signal,
     });
@@ -122,8 +125,10 @@ export class OpenAICompatibleProvider implements AIProvider {
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
-        const data = trimmed.slice(6);
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+        // Menghapus "data:" (bisa lebih dari satu, dengan atau tanpa spasi) dari awal string
+        const data = trimmed.replace(/^(data:\s*)+/, '');
         if (data === '[DONE]') return;
 
         try {
