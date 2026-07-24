@@ -4,7 +4,6 @@ import { OpenRouterProvider } from './openrouter.provider';
 import { GroqProvider } from './groq.provider';
 import { DeepSeekProvider } from './deepseek.provider';
 import { OpenAICompatibleProvider } from './custom.provider';
-import { NinerouterProvider } from './ninerouter.provider';
 
 export function createProvider(providerName: string): AIProvider {
   switch (providerName) {
@@ -18,8 +17,6 @@ export function createProvider(providerName: string): AIProvider {
       return new DeepSeekProvider();
     case 'custom':
       return new OpenAICompatibleProvider();
-    case 'ninerouter':
-      return new NinerouterProvider();
     default:
       throw new Error('PROVIDER_NOT_FOUND');
   }

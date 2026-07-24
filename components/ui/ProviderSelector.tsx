@@ -20,7 +20,6 @@ const PROVIDER_OPTIONS = [
   { value: 'openrouter', label: 'OpenRouter' },
   { value: 'groq', label: 'Groq' },
   { value: 'deepseek', label: 'DeepSeek' },
-  { value: 'ninerouter', label: '9Router (Local)' },
   { value: 'custom', label: 'OpenAI Compatible' },
 ];
 
@@ -379,11 +378,7 @@ export function ProviderSelector() {
                 <label className="mb-1.5 block text-sm font-bold text-secondary">Provider</label>
                 <select
                   value={form.provider_name}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const base_url = value === 'ninerouter' ? 'http://127.0.0.1:20128/v1' : '';
-                    setForm({ ...EMPTY_FORM, provider_name: value, base_url });
-                  }}
+                  onChange={(e) => setForm({ ...EMPTY_FORM, provider_name: e.target.value })}
                   disabled={!!editingProviderId}
                   className="input-gemini"
                 >
@@ -407,14 +402,14 @@ export function ProviderSelector() {
                 />
               </div>
 
-              {['custom', 'ninerouter'].includes(form.provider_name) && (
+              {form.provider_name === 'custom' && (
                 <div>
                   <label className="mb-1.5 block text-sm font-bold text-secondary">Base URL</label>
                   <input
                     type="text"
                     value={form.base_url}
                     onChange={(e) => setForm({ ...form, base_url: e.target.value })}
-                    placeholder={form.provider_name === 'ninerouter' ? 'http://127.0.0.1:20128/v1' : 'https://api.openai.com/v1'}
+                    placeholder="https://api.openai.com/v1"
                     className="input-gemini"
                   />
                 </div>
