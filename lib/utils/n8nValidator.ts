@@ -1,4 +1,6 @@
-interface ValidationResult {
+import { z } from 'zod';
+
+export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
@@ -15,26 +17,71 @@ const WEHBOOK_TYPE = 'n8n-nodes-base.webhook';
 const RESPOND_WEHBOOK_TYPE = 'n8n-nodes-base.respondToWebhook';
 const STICKY_NOTE_TYPE = 'n8n-nodes-base.stickyNote';
 
+// Basic Zod Schema for the n8n JSON output
+const nodeSchema = z.object({
+  id: z.string().min(1, 'missing "id"'),
+  name: z.string().min(1, 'missing "name"'),
+  type: z.string().min(1, 'missing "type"'),
+  typeVersion: z.number().optional(),
+  parameters: z.record(z.unknown()).optional(),
+}).passthrough(); // pass through other unknown fields like position etc
+
+const workflowSchema = z.object({
+  name: z.string().min(1, 'Missing or invalid "name" field'),
+  nodes: z.array(nodeSchema).min(1, 'Missing or empty "nodes" array'),
+  connections: z.record(z.array(z.array(z.record(z.unknown())))).optional(),
+}).passthrough();
+
 export function validateN8nWorkflow(
   workflowJson: string,
 ): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
+  let parsedJson: unknown;
 
-  let parsed: Record<string, unknown>;
   try {
-    parsed = JSON.parse(workflowJson) as Record<string, unknown>;
+    parsedJson = JSON.parse(workflowJson);
   } catch {
     return { valid: false, errors: ['Invalid JSON: cannot parse workflow'], warnings: [], workflow: null };
   }
 
-  if (!parsed.name || typeof parsed.name !== 'string') {
-    errors.push('Missing or invalid "name" field');
+  // Use safeParse to perform structural checks based on zod schema
+  const parsed = workflowSchema.safeParse(parsedJson);
+
+  if (!parsed.success) {
+    // For structural errors, add them to our error list
+    // You could also iterate over issues here to provide field-specific Zod errors
+    for (const issue of parsed.error.issues) {
+      if (issue.path[0] === 'name') {
+        errors.push('Missing or invalid "name" field');
+      } else if (issue.path[0] === 'nodes') {
+         // handle node specific issues or array min lengths
+         if (issue.code === 'too_small' && issue.path.length === 1) {
+            errors.push('Missing or empty "nodes" array');
+            return { valid: false, errors, warnings: [], workflow: null }; // fast exit
+         }
+      }
+    }
+
+    // Catch-all for non-nodes and non-name Zod issues if you wanted to bubble them up
+    // But mostly we just rely on our manual checks if the structure matches the schema closely enough
+    // We will continue if nodes exist, since Zod might fail on a specific node but we handle it below
   }
 
-  const nodes = parsed.nodes as Array<Record<string, unknown>> | undefined;
+  // Typecasting back to how we deal with it in logic (even if Zod failed on some fields, we can still process what we have)
+  const workflowData = parsedJson as Record<string, unknown>;
+
+  if (!workflowData.name || typeof workflowData.name !== 'string') {
+    if (!errors.includes('Missing or invalid "name" field')) {
+       errors.push('Missing or invalid "name" field');
+    }
+  }
+
+  const nodes = workflowData.nodes as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(nodes) || nodes.length === 0) {
-    errors.push('Missing or empty "nodes" array');
+    if (!errors.includes('Missing or empty "nodes" array')) {
+       errors.push('Missing or empty "nodes" array');
+    }
     return { valid: false, errors, warnings: [], workflow: null };
   }
 
@@ -120,7 +167,7 @@ export function validateN8nWorkflow(
     errors.push('Workflow tidak memiliki trigger node. Tambahkan minimal satu trigger: Webhook, Schedule Trigger, atau Manual trigger.');
   }
 
-  const connections = parsed.connections as Record<string, unknown> | undefined;
+  const connections = workflowData.connections as Record<string, unknown> | undefined;
   if (!connections || typeof connections !== 'object') {
     errors.push('Missing or invalid "connections"');
   } else {
@@ -178,6 +225,6 @@ export function validateN8nWorkflow(
     valid: errors.length === 0,
     errors,
     warnings,
-    workflow: errors.length === 0 ? parsed : null,
+    workflow: errors.length === 0 ? (workflowData as Record<string, unknown>) : null,
   };
 }
