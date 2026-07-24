@@ -149,12 +149,12 @@ describe('sequentialPrompts', () => {
         '03_DATA_MODELS.md': 'This is Data',
       };
       const prompt = buildSingleFileConsistencyPrompt('02_ARCHITECTURE.md', 'Arch content', files);
-      expect(prompt).toContain('Periksa apakah file 02_ARCHITECTURE.md konsisten dengan 01_PRD.md');
+      expect(prompt).toContain('Tugas Anda adalah melakukan REGENERATE pada file 02_ARCHITECTURE.md');
       expect(prompt).toContain('--- 01_PRD.md (SOURCE OF TRUTH) ---');
       expect(prompt).toContain('This is PRD');
-      expect(prompt).toContain('--- 03_DATA_MODELS.md (REFERENSI KONSISTENSI) ---');
+      expect(prompt).toContain('--- 03_DATA_MODELS.md (REFERENSI KONSISTENSI - WAJIB DIIKUTI) ---');
       expect(prompt).toContain('This is Data');
-      expect(prompt).toContain('--- 02_ARCHITECTURE.md (FILE HASIL REGENERATE) ---');
+      expect(prompt).toContain('--- 02_ARCHITECTURE.md (FILE YANG HARUS DI-REGENERATE / DIPERIKSA) ---');
       expect(prompt).toContain('Arch content');
     });
   });

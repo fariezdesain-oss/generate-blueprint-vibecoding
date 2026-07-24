@@ -62,8 +62,7 @@ export class OpenAICompatibleProvider implements AIProvider {
           model: config.modelName,
           messages: [{ role: 'user', content }],
           stream: false,
-          // Hanya kirim max_tokens jika bukan koneksi ke IP lokal (127.0.0.1 atau localhost)
-          ...(baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') ? {} : { max_tokens: maxTokens }),
+          max_tokens: maxTokens,
         }),
         signal: controller.signal,
       });
@@ -98,8 +97,7 @@ export class OpenAICompatibleProvider implements AIProvider {
         model: config.modelName,
         messages: [{ role: 'user', content }],
         stream: true,
-        // Hanya kirim max_tokens jika bukan koneksi ke IP lokal (127.0.0.1 atau localhost)
-        ...(baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost') ? {} : { max_tokens: maxTokens }),
+        max_tokens: maxTokens,
       }),
       signal,
     });
