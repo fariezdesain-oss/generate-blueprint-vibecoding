@@ -60,7 +60,7 @@ export function detectModelCapabilities(providerName: string, modelName: string)
     return {
       contextLevel: 'high',
       maxTokens: 32000,
-      previewLimit: 3000,
+      previewLimit: 25000, // Dramatically increased to preserve full context (tables, architectures) for capable models
       timeoutMs: 240000,
       retryCount: 3,
       consistencyMode: 'full',

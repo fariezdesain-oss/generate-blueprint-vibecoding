@@ -27,7 +27,7 @@ describe('providerConfig', () => {
       model_capabilities: {
         contextLevel: 'high',
         maxTokens: 32000,
-        previewLimit: 3000,
+        previewLimit: 25000,
         timeoutMs: 240000,
         retryCount: 3,
         consistencyMode: 'full',
