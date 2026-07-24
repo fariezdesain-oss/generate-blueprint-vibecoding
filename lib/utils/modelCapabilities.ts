@@ -56,7 +56,7 @@ export function detectModelCapabilities(providerName: string, modelName: string)
     };
   }
 
-  if (hasMatch(model, HIGH_CONTEXT_PATTERNS) || provider === 'gemini') {
+  if (hasMatch(model, HIGH_CONTEXT_PATTERNS) || provider === 'gemini' || provider === 'ninerouter') {
     return {
       contextLevel: 'high',
       maxTokens: 32000,

@@ -16,6 +16,7 @@ export function createProvider(providerName: string): AIProvider {
     case 'deepseek':
       return new DeepSeekProvider();
     case 'custom':
+    case 'ninerouter':
       return new OpenAICompatibleProvider();
     default:
       throw new Error('PROVIDER_NOT_FOUND');
