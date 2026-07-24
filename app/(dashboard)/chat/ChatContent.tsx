@@ -798,7 +798,7 @@ export function ChatContent({ sessionIdParam }: { sessionIdParam: string | null 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.shiftKey || e.metaKey)) {
       e.preventDefault();
       if (isGenerating) return;
       sendMessage();

@@ -37,7 +37,7 @@ test('tombol generate disabled lalu enabled setelah readiness signal', async ({ 
   await expect(generateButton).toBeDisabled();
 
   await page.getByTestId('chat-textarea').fill('Siap generate');
-  await page.getByTestId('chat-textarea').press('Enter');
+  await page.getByTestId('chat-textarea').press('Control+Enter');
   await expect(generateButton).toBeEnabled();
 });
 
@@ -133,7 +133,7 @@ test('modal progres di ChatContent menampilkan dot step dan progress bar yang ak
 
   const generateButton = page.getByTestId('generate-button');
   await page.getByTestId('chat-textarea').fill('Siap generate');
-  await page.getByTestId('chat-textarea').press('Enter');
+  await page.getByTestId('chat-textarea').press('Control+Enter');
   await expect(generateButton).toBeEnabled();
 
   await generateButton.click();
@@ -227,7 +227,7 @@ test('mengklik Hentikan Generate memanggil API cancel dan memungkinkan user untu
 
   const generateButton = page.getByTestId('generate-button');
   await page.getByTestId('chat-textarea').fill('Siap generate');
-  await page.getByTestId('chat-textarea').press('Enter');
+  await page.getByTestId('chat-textarea').press('Control+Enter');
   await expect(generateButton).toBeEnabled();
 
   await generateButton.click();

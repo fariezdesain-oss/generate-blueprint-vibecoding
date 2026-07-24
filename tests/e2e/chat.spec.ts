@@ -43,7 +43,7 @@ test('chat bisa mengirim pesan dengan mock streaming', async ({ page }) => {
   });
 
   await page.getByTestId('chat-textarea').fill('Halo dari E2E');
-  await page.getByTestId('chat-textarea').press('Enter');
+  await page.getByTestId('chat-textarea').press('Control+Enter');
   await expect(page.getByText('Halo dari E2E')).toBeVisible();
   await expect(page.getByText('E2E_CHAT_SENTINEL')).toBeVisible();
 });
@@ -83,7 +83,7 @@ test('chat regenerate parsial hanya memproses file yang diminta', async ({ page 
   });
 
   await page.getByTestId('chat-textarea').fill('Generate ulang tasks dan AI rules');
-  await page.getByTestId('chat-textarea').press('Enter');
+  await page.getByTestId('chat-textarea').press('Control+Enter');
   await expect(page.getByText(/Saya akan regenerate 08_TASKS.md/)).toBeVisible();
   
   // Tunggu animasi button selesai
